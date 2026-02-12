@@ -236,7 +236,7 @@ def callback_inline(call):
                              water_goal_selection_msg(call.from_user.first_name),
                              reply_markup=water_goal_keyboard()
                              )
-        case data if data.startswith('water_goal_') | 'water_reminder_exit':
+        case data if data.startswith('water_goal_') or data == 'water_reminder_exit':
             match call.data.split('_')[-1]:
                 case 1500 | 2000 | 2500 | 3000:
                     step = 'set_goal'

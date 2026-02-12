@@ -353,35 +353,16 @@ def update_last_add_water_ml(user_id):
     conn.close()
 
 
-def validate_water_addition(user_id, added_water_ml):
-    from messages import water_add_time_limit_msg, water_add_hard_limit_msg, water_add_reasonable_limit_msg
-    # Константы
-    min_interval = 15  # минут между записями
-    daily_reasonable_limit = 5000  # мл за день (5 литров) - разумный максимум
-    daily_hard_limit = 8000  # мл за день (8 литров) - абсолютный максимум
-
+def get_water_stats_for_today(user_id):
     today = get_user_time_now(user_id)
-    utc_time = datetime.now() - timedelta(hours=3)
     day_name = today.strftime('%A')
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f'SELECT last_update,{day_name} FROM track_water WHERE user_id = ?', (user_id,))
     update_time, cnt_water = cursor.fetchone()
     conn.close()
-    if update_time:
-        update_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
-        time_diff = (utc_time - update_time).total_seconds() / 60
-        if time_diff < min_interval:
-            wait_time = min_interval - int(time_diff)
-            return False, water_add_time_limit_msg(wait_time)
+    return update_time, cnt_water
 
-    daily_total = int(cnt_water) + int(added_water_ml)
-    if daily_total > daily_hard_limit:
-        return False, water_add_hard_limit_msg(daily_hard_limit)
-    elif daily_total > daily_reasonable_limit:
-        over_amount = daily_total - daily_reasonable_limit
-        return True, water_add_reasonable_limit_msg(over_amount)
-    return True, None
 
 
 def add_ticket(title, user_id, username, first_name, type_supp):

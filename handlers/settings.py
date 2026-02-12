@@ -1,8 +1,8 @@
-from database import update_goal, count_users_trackers, water_set_reminder_type, get_timezone, set_timezone, \
+from database import count_users_trackers, water_set_reminder_type, get_timezone, set_timezone, \
     update_water_goal
 from keyboards import water_goal_keyboard, water_setup_keyboard, water_goal_custom_cancel, \
     get_water_reminder_type_keyboard, main_menu
-from messages import incorrect_format, water_goal_limit_msg, water_goal_success_msg, water_goal_selection_msg, \
+from messages import  water_goal_limit_msg, water_goal_success_msg, water_goal_selection_msg, \
     water_tracker_setup_msg, water_goal_incorrect_format_msg, water_reminder_type_selection_msg, \
     water_setup_required_msg, water_reminder_type_smart_msg, water_interval_selected_short_msg, cancellation, \
     timezone_suc_msg, start_message, water_goal_custom_msg
@@ -74,7 +74,7 @@ def water_goal_custom_stg(bot, message, call, send_msg):
     ml = message.text.strip()
     if ml.replace('.', '', 1).isdigit():
         if 500 <= float(ml) <= 8000:
-            update_goal(call.from_user.id, ml)
+            update_water_goal(call.from_user.id, ml)
             bot.send_message(call.message.chat.id, water_goal_success_msg(ml))
             bot.delete_message(message.chat.id, send_msg.message_id)
             bot.send_message(
