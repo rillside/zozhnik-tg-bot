@@ -282,19 +282,19 @@ def accept_aggressive_title_keyboard(title,type_ticket):
     return keyboard
 def accept_aggressive_msg_keyboard(ticket_id,text):
     keyboard = types.InlineKeyboardMarkup()
-    btn_accept = types.InlineKeyboardButton("✅ Подтвердить отправку", callback_data=f'msg_to_ticket_accept_{ticket_id}_{text}')
-    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'msg_to_ticket_cancel_{ticket_id}')
+    btn_accept = types.InlineKeyboardButton("✅ Подтвердить отправку", callback_data=f'aggressive_msg_to_ticket_accept_{ticket_id}_{text}')
+    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'aggressive_msg_to_ticket_cancel_{ticket_id}')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
 def accept_custom_add_water_keyboard(amount_ml):
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'water_add_{amount_ml}')
-    btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'custom_water_add_cancel')
+    btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'water_add_custom_cancel')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
 def cancel_custom_add_water_keyboard():
     keyboard = types.InlineKeyboardMarkup()
-    btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'custom_water_add_cancel')
+    btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'water_add_custom_cancel')
     keyboard.add(btn_cancel)
     return keyboard
 def accept_delete_ticket_keyboard(ticket_id):

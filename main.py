@@ -1,38 +1,32 @@
 import telebot
-import re
 import logging
 import time
 from requests.exceptions import ReadTimeout, ConnectionError
-from database import init_db, add_user, update_user_activity_smart, get_all_admin, update_username, replace_status, \
-    get_user_status, water_set_reminder_type, update_goal, count_users_trackers, water_stats, get_timezone, \
-    set_timezone, add_water_ml, update_last_add_water_ml, tickets_by_user, \
-    validate_water_addition, delete_ticket, load_tickets_info, count_tickets_for_admin, send_supp_msg, add_ticket
-from handlers.admin_notifications import return_admin_notify, new_ticket_notify
+from database import init_db, add_user, update_user_activity_smart, get_all_admin, update_username, \
+    count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info
 from handlers.broadcast import broadcast_send, accept_broadcast
-from handlers.owner_menu import add_admin, remove_admin
+from handlers.owner_menu import add_admin, remove_admin, return_admin
 from handlers.reminders import UniversalReminderService
-from handlers.support import create_ticket, opening_ticket
-from handlers.water import add_custom_water
+from handlers.support import create_ticket, opening_ticket, handle_delete_ticket, \
+    handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page
+from handlers.water import handle_add_water
 from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_cancel, settings_keyboard, \
-    water_setup_keyboard, water_goal_keyboard, water_goal_custom_cancel, get_water_reminder_type_keyboard, \
-    get_water_interval_keyboard, water_add_keyboard, timezone_selection_keyboard, support_selection_keyboard, \
-    consultation_support_keyboard, technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
-    admin_ticket_section_keyboard, cancel_custom_add_water_keyboard, supp_ticket_draft_keyboard, \
-    accept_delete_ticket_keyboard
+    water_setup_keyboard, water_goal_keyboard, get_water_interval_keyboard, water_add_keyboard, \
+    timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
+    technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
+    admin_ticket_section_keyboard
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
-    add_new_adm_msg, remove_adm_msg, user_return_admin_msg, succ_return_adm, owner_unban, already_return_adm_msg, \
-    error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_goal_success_msg, \
-    water_goal_custom_msg, water_reminder_type_selection_msg, water_reminder_type_smart_msg, water_interval_setup_msg, \
-    water_interval_selected_short_msg, water_setup_required_msg, water_tracker_dashboard_msg, water_goal_not_set_msg, \
-    timezone_selection_msg, timezone_suc_msg, add_water_msg, support_selection_msg, support_tech_msg, \
-    support_consult_msg, create_ticket_msg, no_active_tickets_msg, send_msg_to_ticket_msg, opening_ticket_msg, \
-    open_ticket_msg, ticket_closed_msg, my_tickets_msg, admin_ticket_section_msg, admin_tickets_msg, \
-    water_add_custom_input_msg, succ_ticket_title_msg, confirm_delete_ticket_msg
-from handlers.settings import water_goal_custom_stg
+    add_new_adm_msg, remove_adm_msg, \
+    error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
+    water_tracker_dashboard_msg, water_goal_not_set_msg,timezone_selection_msg, support_selection_msg, \
+    support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
+    my_tickets_msg,admin_ticket_section_msg
+from handlers.settings import set_reminder_type_water, water_smart_type_install, \
+    water_setting_interval, select_timezone, water_goal_settings
 from handlers.sleeps import sleeps_main
 from handlers.sports import sports_main
 from handlers.stats import adm_stats, owner_stats
-from config import token, is_admin, is_owner, owners_copy
+from config import token, is_admin, is_owner
 
 bot = telebot.TeleBot(token)
 logging.basicConfig(
@@ -167,20 +161,8 @@ def msg(message):
 # @error_handler
 def callback_inline(call):
     match call.data:
-        case 'timezone_-1' | 'timezone_0' | 'timezone_1' | 'timezone_2' | \
-             'timezone_3' | 'timezone_4' | 'timezone_5' | \
-             'timezone_6' | 'timezone_7' | 'timezone_8' | 'timezone_9':
-            timezone_offset = int(call.data.split('_')[1])
-            old_timezone = get_timezone(call.message.chat.id)
-            set_timezone(call.message.chat.id, timezone_offset)
-            bot.answer_callback_query(call.id, timezone_suc_msg, show_alert=False)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            if old_timezone is None:
-                bot.send_message(
-                    call.message.chat.id,
-                    start_message(call.from_user.first_name),
-                    reply_markup=main_menu(call.message.chat.id)
-                )
+        case data if data.startswith('timezone_'):
+            select_timezone(call, bot)
         case 'br_accept':
             broadcast_send(call, bot)
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -212,17 +194,7 @@ def callback_inline(call):
             bot.clear_step_handler_by_chat_id(call.message.chat.id)
             bot.send_message(call.message.chat.id, cancellation)
         case 'return_adm':
-            user_id = int(re.search(r'ID Нарушителя: (\d+)', call.message.text).group(1))
-            if user_id in owners_copy:
-                bot.send_message(call.message.chat.id, owner_unban)
-            elif get_user_status(user_id=user_id) == "Admin":
-                bot.send_message(call.mesage.chat.id, already_return_adm_msg)
-            else:
-                replace_status('Admin', user_id=user_id)
-                bot.send_message(user_id, user_return_admin_msg)
-                bot.send_message(call.message.chat.id, succ_return_adm)
-                return_admin_notify(bot, user_id, call.message.chat.id)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
+            return_admin(call, bot)
 
         case 'water_settings':
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -246,95 +218,36 @@ def callback_inline(call):
                              )
 
         case 'water_reminder':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            if count_users_trackers('track_water', 'goal_ml', call.message.chat.id):
-                bot.send_message(
-                    call.message.chat.id,
-                    water_reminder_type_selection_msg(
-                        call.from_user.first_name)
-                    , reply_markup=get_water_reminder_type_keyboard()
-                )
-            else:
-                bot.send_message(call.message.chat.id,
-                                 water_setup_required_msg,
-                                 reply_markup=water_goal_keyboard())
+            set_reminder_type_water(call, bot)
         case 'type_smart':
-            bot.answer_callback_query(call.id, water_reminder_type_smart_msg, show_alert=False)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            water_set_reminder_type(call.message.chat.id, 'Smart')
-            bot.send_message(
-                call.message.chat.id,
-                water_tracker_setup_msg(call.from_user.first_name),
-                reply_markup=water_setup_keyboard()
-            )
+            water_smart_type_install(call, bot)
         case 'type_interval':
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(
                 call.message.chat.id, water_interval_setup_msg(call.from_user.first_name),
                 reply_markup=get_water_interval_keyboard()
             )
-        case 'water_interval_1h' | 'water_interval_2h' | 'water_interval_3h' | 'water_interval_4h' | 'water_interval_5h':
-            interval = int(call.data[-2])
-            bot.answer_callback_query(call.id, water_interval_selected_short_msg(interval), show_alert=False)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(
-                call.message.chat.id,
-                water_tracker_setup_msg(call.from_user.first_name),
-                reply_markup=water_setup_keyboard()
-            )
-            water_set_reminder_type(call.message.chat.id, 'Interval', interval)
-        case 'water_interval_exit':
-            bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(
-                call.message.chat.id,
-                water_reminder_type_selection_msg(
-                    call.from_user.first_name)
-                , reply_markup=get_water_reminder_type_keyboard()
-            )
+        case data if data.startswith('water_interval_'):
+            step = 'exit' if data.split('_')[-1] == 'exit' else 'install'
+            water_setting_interval(call, bot, step)
         case 'water_goal':
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
                              water_goal_selection_msg(call.from_user.first_name),
                              reply_markup=water_goal_keyboard()
                              )
-        case 'water_goal_1500' | 'water_goal_2000' | 'water_goal_2500' | 'water_goal_3000':
-            goal_ml = int((call.data[11:]))
-            update_goal(call.from_user.id, goal_ml)
-            bot.answer_callback_query(call.id, water_goal_success_msg(goal_ml))
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(
-                call.message.chat.id,
-                water_tracker_setup_msg(call.from_user.first_name),
-                reply_markup=water_setup_keyboard()
-            )
+        case data if data.startswith('water_goal_') | 'water_reminder_exit':
+            match call.data.split('_')[-1]:
+                case 1500 | 2000 | 2500 | 3000:
+                    step = 'set_goal'
+                case 'custom':
+                    step = 'set_goal_custom'
+                case 'exit':
+                    step = 'exit'
+                case 'cancel':
+                    step = 'cancel_custom'
+            water_goal_settings(call, bot, step)
 
-        case 'water_goal_custom':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            send_custom_selection_msg = bot.send_message(
-                call.message.chat.id,
-                water_goal_custom_msg, reply_markup=water_goal_custom_cancel()
-            )
-            bot.register_next_step_handler_by_chat_id(
-                call.message.chat.id,
-                lambda msg: water_goal_custom_stg(bot, msg, call, send_custom_selection_msg)
-            )
-        case 'water_goal_exit' | 'water_reminder_exit':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            bot.send_message(
-                call.message.chat.id,
-                water_tracker_setup_msg(call.from_user.first_name)
-                , reply_markup=water_setup_keyboard()
-            )
-        case 'water_goal_custom_cancel':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            bot.clear_step_handler_by_chat_id(call.message.chat.id)
-            bot.send_message(call.message.chat.id,
-                             water_goal_selection_msg(call.from_user.first_name),
-                             reply_markup=water_goal_keyboard()
-                             )
         case 'water_stg_cancel':
             bot.answer_callback_query(call.id, cancellation, show_alert=False)
             bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -350,48 +263,19 @@ def callback_inline(call):
                 exit_home(),
                 reply_markup=main_menu(call.message.chat.id)
             )
-        case data if (data.startswith('water_add')
-                      and len(data.split('_')) == 3
-                      and data.split('_')[-1].isdigit()):
-            water_add = call.data.split('_')[2]
-            accept, msg = validate_water_addition(call.message.chat.id, water_add)
-
-            if accept:
-                update_last_add_water_ml(call.message.chat.id)
-                add_water_ml(call.message.chat.id, water_add)
-                bot.answer_callback_query(call.id, add_water_msg)
-                bot.delete_message(call.message.chat.id, call.message.message_id)
-                current_goal, water_drunk = water_stats(call.message.chat.id)
-                bot.send_message(call.message.chat.id,
-                                 water_tracker_dashboard_msg(
-                                     call.from_user.first_name,
-                                     current_goal, water_drunk),
-                                 reply_markup=water_add_keyboard()
-                                 )
-            if msg:
-                bot.send_message(call.message.chat.id, msg)
-        case 'water_add_custom':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(call.message.chat.id,
-                             water_add_custom_input_msg(
-                                 call.message.from_user.first_name),
-                                 reply_markup=cancel_custom_add_water_keyboard()
-                             )
-            bot.register_next_step_handler_by_chat_id(
-                call.message.chat.id,
-                lambda msg: add_custom_water(msg, bot)
-            )
-        case 'custom_water_add_cancel':
-            bot.clear_step_handler_by_chat_id(call.message.chat.id)
-            bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            current_goal, water_drunk = water_stats(call.message.chat.id)
-            bot.send_message(call.message.chat.id,
-                             water_tracker_dashboard_msg(
-                                 call.message.from_user.first_name,
-                                 current_goal, water_drunk),
-                             reply_markup=water_add_keyboard()
-                             )
+        case data if ((data == 'water_add_custom'
+                       or data == 'water_add_custom_cancel')
+                      or (data.startswith('water_add')
+                          and len(data.split('_')) == 3
+                          and data.split('_')[-1].isdigit())):
+            match data.split('_')[-1]:
+                case 'custom':
+                    step = 'request_value'
+                case 'cancel':
+                    step = 'custom_cancel'
+                case _:
+                    step = 'addition'
+            handle_add_water(call, bot, step)
         case 'technical_support' | 'personal_consultation':
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
@@ -419,40 +303,16 @@ def callback_inline(call):
             bot.answer_callback_query(call.id, opening_ticket_msg)
             bot.delete_message(call.message.chat.id, call.message.message_id)
             opening_ticket(call.message, bot, id_ticket, 'user')
-        case data if data.startswith('confirm_delete_ticket_'):
-            ticket_id = data.split('_')[3]
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(
-                call.message.chat.id,
-                confirm_delete_ticket_msg(ticket_id),
-                reply_markup=accept_delete_ticket_keyboard(ticket_id)
-            )
-        case data if data.startswith('cancel_delete_ticket_'):
-            id_ticket = data.split('_')[3]
-            bot.answer_callback_query(call.id, cancellation)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            opening_ticket(call.message, bot, id_ticket, 'user')
-            bot.clear_step_handler_by_chat_id(call.message.chat.id)
-        case data if data.startswith('delete_ticket_'):
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            id_ticket = data.split('_')[2]
-            delete_ticket(id_ticket)
-            bot.send_message(call.message.chat.id, ticket_closed_msg(id_ticket))
+        case data if data.startswith(('delete_ticket_',
+                                      'confirm_delete_ticket_',
+                                      'cancel_delete_ticket_')
+                                     ):
+            type_handle = data.split('_')[0]
+            handle_delete_ticket(call, bot, type_handle)
 
-        case data if data.startswith('aggressive_title_'):
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            if data.split('_')[2] == 'accept':
-                title,type_ticket = data.split('_')[3],data.split('_')[4]
-                id_ticket = add_ticket(title, call.message.chat.id,
-                                       call.message.from_user.username,
-                                       call.message.from_user.first_name,
-                                       type_ticket
-                                       )
-                bot.send_message(call.message.chat.id, succ_ticket_title_msg,
-                                 reply_markup=supp_ticket_draft_keyboard(id_ticket))
-                new_ticket_notify(bot, id_ticket, call.message.chat.id, type_ticket)
-            else:
-                bot.send_message(call.message.chat.id, ticket_closed_msg())
+        case data if data.startswith(('aggressive_title_', 'aggressive_msg_to_ticket_')):
+            content_type = 'msg' if data.split('_')[1] == 'msg' else 'title'
+            handling_aggressive_content(call, bot, content_type)
         case 'my_tickets':
             if tickets_by_user(call.message.chat.id):
                 bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -464,71 +324,13 @@ def callback_inline(call):
                 )
             else:
                 bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
-        case data if data.startswith('msg_to_ticket_'):
-            ticket_id = data.split('_')[4]
-            if data.split('_')[3] == 'accept':
-                bot.delete_message(call.message.chat.id, call.message.message_id)
-                text = data.split('_')[5]
-                send_supp_msg(ticket_id, text, 1)
-                opening_ticket(call.message, bot, ticket_id, 'user')
-            else:
-                bot.delete_message(call.message.chat.id, call.message.message_id)
-                bot.answer_callback_query(call.id, cancellation, show_alert=False)
-                opening_ticket(call.message, bot, ticket_id, 'user')
+
         case data if data.startswith('ticket_exit'):
-            bot.clear_step_handler_by_chat_id(call.message.chat.id)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            role = 'admin' if call.data.split('_')[-2] == 'admin' else 'user'
-            try:
-                limit = -2 if role == 'admin' else -1
-                for i in data.split('_')[2:limit]:
-                    bot.delete_message(call.message.chat.id, int(i))
-            except:
-                pass
-            if role == 'user':
-                if tickets_by_user(call.message.chat.id):
-                    bot.send_message(
-                        call.message.chat.id,
-                        my_tickets_msg,
-                        reply_markup=opening_ticket_keyboard('user',
-                                                             load_tickets_info(call.message.chat.id))
-                    )
-                else:
-                    bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
-            else:
-                type_supp = call.data.split('_')[-1]
-                if count_tickets_for_admin(type_supp):
-                    bot.send_message(call.message.chat.id
-                                     , admin_tickets_msg(type_supp),
-                                     reply_markup=
-                                     opening_ticket_keyboard('admin', load_tickets_info(role='admin', type=type_supp)
-                                                             ))
-                else:
-                    bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
+            ticket_exit(call, bot)
         case 'adm_tickets_tech' | 'adm_tickets_consult':
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            type_supp = call.data.split('_')[2]
-            if count_tickets_for_admin(type_supp):
-                bot.send_message(call.message.chat.id
-                                 , admin_tickets_msg(type_supp),
-                                 reply_markup=
-                                 opening_ticket_keyboard('admin', load_tickets_info(role='admin', type=type_supp)
-                                                         ))
-            else:
-                bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
+            admin_look_tickets(call,bot)
         case data if data.startswith('tickets_exit'):
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            if data.split('_')[2] == 'user':
-                bot.send_message(call.message.chat.id, support_selection_msg(
-                    call.message.from_user.first_name),
-                                 reply_markup=support_selection_keyboard()
-                                 )
-            else:
-                bot.send_message(call.message.chat.id,
-                                 admin_ticket_section_msg(
-                                     call.message.from_user.first_name),
-                                 reply_markup=admin_ticket_section_keyboard()
-                                 )
+            tickets_exit(call,bot)
         case 'adm_back_main':
             bot.delete_message(call.message.chat.id, call.message.message_id)
             bot.send_message(call.message.chat.id,
@@ -536,20 +338,7 @@ def callback_inline(call):
                              reply_markup=admin_menu(call.message.chat.id)
                              )
         case data if data.startswith('tickets_page_'):
-            print(data)
-            page, role = data.split('_')[2], data.split('_')[3]
-            if role == 'admin':
-                type = data.split('_')[4]
-                text = admin_tickets_msg(type)
-            else:
-                type = None
-                text = my_tickets_msg
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(call.message.chat.id, text,
-                             reply_markup=opening_ticket_keyboard(
-                                 role, load_tickets_info(call.message.chat.id, role=role, type=type),
-                                 int(page))
-                             )
+            look_ticket_page(call,bot)
         case data if data.startswith('open_ticket_'):
             bot.delete_message(call.message.chat.id, call.message.message_id)
             ticket_id, role = data.split('_')[2], data.split('_')[3]
@@ -566,7 +355,7 @@ def callback_inline(call):
 
 def start_bot():
     init_db()
-    reminder_service =  UniversalReminderService(bot)
+    reminder_service = UniversalReminderService(bot)
     reminder_service.start()
     while True:
         try:

@@ -265,7 +265,7 @@ def update_reminder_sent_time(user_id):
     conn.commit()
     conn.close()
 
-def update_goal(user_id, new_goal):
+def update_water_goal(user_id, new_goal):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('UPDATE track_water SET goal_ml = ? WHERE user_id = ?',

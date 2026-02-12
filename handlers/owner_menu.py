@@ -1,11 +1,13 @@
-from config import is_admin
+import re
+from config import is_admin, owners_copy
 from database import is_user_valid, get_all_admin, get_user_status, \
     get_id_by_username, replace_status
-from handlers.admin_notifications import add_admin_notify, remove_admin_notify
+from handlers.admin_notifications import add_admin_notify, remove_admin_notify, return_admin_notify
 from handlers.stats import owner_stats
 from keyboards import owner_menu
 from messages import incorrect_format, user_nf, user_already_admin, success_new_admin, owner_demotion_error, \
-    attempt_demote_owner, user_not_admin, success_remove_admin, user_removed_admin, user_now_admin
+    attempt_demote_owner, user_not_admin, success_remove_admin, user_removed_admin, user_now_admin, owner_unban, \
+    already_return_adm_msg, user_return_admin_msg, succ_return_adm
 
 
 def add_admin(msg, bot):
@@ -85,3 +87,15 @@ def remove_admin(msg, bot):
     else:
         bot.send_message(msg.chat.id, incorrect_format)
     bot.send_message(msg.chat.id, owner_stats(get_all_admin()), reply_markup=owner_menu())
+def return_admin(call, bot):
+    user_id = int(re.search(r'ID Нарушителя: (\d+)', call.message.text).group(1))
+    if user_id in owners_copy:
+        bot.send_message(call.message.chat.id, owner_unban)
+    elif get_user_status(user_id=user_id) == "Admin":
+        bot.send_message(call.mesage.chat.id, already_return_adm_msg)
+    else:
+        replace_status('Admin', user_id=user_id)
+        bot.send_message(user_id, user_return_admin_msg)
+        bot.send_message(call.message.chat.id, succ_return_adm)
+        return_admin_notify(bot, user_id, call.message.chat.id)
+    bot.delete_message(call.message.chat.id, call.message.message_id)
