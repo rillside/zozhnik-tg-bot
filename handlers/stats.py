@@ -1,4 +1,4 @@
-from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers
+from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin
 from messages import adm_stats_msg
 
 def case_of_numerals(number):
@@ -9,20 +9,21 @@ def case_of_numerals(number):
         return str(number) + forms[1]  # 2, 3, 4, 22, 23, 24...
     else:
         return str(number) + forms[2] # 5-20, 25-30, 35-40..
-def adm_stats():
-    cnt_users = len(all_users())
-    active_cnt_users = get_active_users_count()
+async def adm_stats():
+    cnt_users = len(await all_users())
+    active_cnt_users = await get_active_users_count()
     active_cnt_users_percent = round(active_cnt_users / cnt_users * 100)
     active_cnt_users = case_of_numerals(active_cnt_users)
     cnt_users = case_of_numerals(cnt_users)
     new_user_to_week = get_new_users_count(7)
     new_user_to_day = get_new_users_count(1)
-    water_track_cnt = case_of_numerals(count_users_trackers('track_water','goal_ml'))
+    water_track_cnt = case_of_numerals(await count_users_trackers('track_water','goal_ml'))
 
     return adm_stats_msg(cnt_users, active_cnt_users,active_cnt_users_percent, new_user_to_week, new_user_to_day,water_track_cnt)
 
 
-def owner_stats(admins):
+async def owner_stats():
+    admins =  await get_all_admin()
     if not admins:
         return "👑 Список администрации:\n\n📭 Администраторы не найдены"
 

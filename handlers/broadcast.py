@@ -1,5 +1,5 @@
 import logging
-import time
+import asyncio
 
 from config import is_owner, owners, save_owners
 from database import all_users, replace_status
@@ -19,30 +19,30 @@ logging.basicConfig(
 
 
 
-def accept_broadcast(message, bot):
+async def accept_broadcast(message, bot):
     if message.text.strip():
-        bot.send_message(message.chat.id, f"📋 Предпросмотр:\n{message.text}", reply_markup=accept_send())
+        await bot.send_message(message.chat.id, f"📋 Предпросмотр:\n{message.text}", reply_markup=accept_send())
 
 
-def broadcast_send(call, bot):
-    message = call.message.text.split(':', 1)[1]
+async def broadcast_send(call, bot):
+    message = call.message.text.split(':', 1)[1].strip()
     sender_id = call.message.chat.id
     sender_username = call.from_user.username
     sender = '@' + sender_username if sender_username is not None else sender_id
     unsucc = 0
     succ = 0
     if censor_check(message):
-        for i in all_users():
+        for i in await all_users():
             try:
-                bot.send_message(
+                await bot.send_message(
                     i, message +
                        f"\n\n📨 Отправитель: {sender}" if is_owner(i) else message
                 )
-                time.sleep(0.07)
+                await asyncio.sleep(0.07)
                 succ += 1
             except Exception as e:
                 unsucc += 1
                 print(f"Ошибка при отправке рассылки {i}:\n{e}")
-        bot.send_message(call.message.chat.id, broadcast_stats(succ, unsucc))
+        await bot.send_message(call.message.chat.id, broadcast_stats(succ, unsucc))
     else:
-        removal_of_admin_rights(bot,message,sender_id,sender_username,'br')
+        await removal_of_admin_rights(bot,message,sender_id,sender_username,'br')

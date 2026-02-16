@@ -19,7 +19,7 @@ if not token:
     raise ValueError("❌ BOT_TOKEN не найден в .env файле!")
 owners = load_owners()
 owners_copy = owners[:]
-ai_censor = False
+ai_censor_enabled = False
 censorship_threshold = 0.5 #Порог срабатывания AI цензуры
 
 def save_owners():
@@ -27,11 +27,12 @@ def save_owners():
         json.dump(owners, f, indent=2)
 
 
-def is_admin(user_id=None, username=None):
+async def is_admin(user_id=None, username=None):
     if user_id:
-        return get_user_status(user_id=user_id) in ['Admin', 'Owner']
+        return await get_user_status(user_id=user_id) in ['Admin', 'Owner']
     elif username:
-        return get_user_status(username=username) in ['Admin', 'Owner']
+        return await get_user_status(username=username) in ['Admin', 'Owner']
+    return None
 
 
 def is_owner(user_id):
