@@ -1,5 +1,8 @@
+import asyncio
+
 from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin
-from messages import adm_stats_msg
+from messages import adm_stats_msg, owner_stats_msg
+
 
 def case_of_numerals(number):
     forms = (' пользователь', ' пользователя', ' пользователей')
@@ -24,12 +27,6 @@ async def adm_stats():
 
 async def owner_stats():
     admins =  await get_all_admin()
-    if not admins:
-        return "👑 Список администрации:\n\n📭 Администраторы не найдены"
-
-    admins_list = []
-    for admin in admins:
-        admins_list.append(f"🆔 ID: {admin[0]}\n"
-                           f"👤 Username: {'@' + admin[1] if admin[1] else 'Не указан'}")
-
-    return "👑 Список администрации\n\n" + "\n\n".join(admins_list)
+    event_loop = asyncio.get_event_loop()
+    res = event_loop.run_in_executor(None, owner_stats_msg, admins)
+    return res

@@ -1,6 +1,6 @@
 from telebot import types
 
-from config import is_admin, is_owner
+from config import is_owner
 from database import get_all_admin
 from utils.ticket_sorting import sort_ticket
 
@@ -25,7 +25,7 @@ def timezone_selection_keyboard():
     return keyboard
 
 
-def main_menu(user_id):  # Основная клавиатура
+def main_menu(user_id,is_admin):  # Основная клавиатура
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add("💧 Водный баланс")
     keyboard.add("💪 Физ-активность", "😴 Сон")

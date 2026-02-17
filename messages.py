@@ -293,8 +293,19 @@ def water_tracker_dashboard_msg(first_name, current_goal, water_drunk):
 ✨ Каждый глоток приближает к цели!"""
 
 
-def water_quick_reminder_msg( current_goal, water_drunk):
+def owner_stats_msg(admins):
+    if not admins:
+        return "👑 Список администрации:\n\n📭 Администраторы не найдены"
 
+    admins_list = []
+    for admin in admins:
+        admins_list.append(f"🆔 ID: {admin[0]}\n"
+                           f"👤 Username: {'@' + admin[1] if admin[1] else 'Не указан'}")
+
+    return "👑 Список администрации\n\n" + "\n\n".join(admins_list)
+
+
+def water_quick_reminder_msg(current_goal, water_drunk):
     water_left = max(0, current_goal - water_drunk)
 
     return f"""💧 Напоминание от ЗОЖника
@@ -308,6 +319,8 @@ def water_quick_reminder_msg( current_goal, water_drunk):
 ⏳ Осталось: {water_left} мл.
 
 💡 Выпей сейчас и обнови статистику! ⬇️✨"""
+
+
 def water_add_time_limit_msg(wait_time):
     return f"⏳ Подождите {wait_time} мин. перед следующей записью"
 
@@ -349,6 +362,7 @@ def water_add_reasonable_limit_msg(over_amount):
 3. Опишите ваш запрос — и наш специалист свяжется с вами!
 
 ✨ Помните: правильная гидратация — ключ к хорошему самочувствию!"""
+
 
 def support_selection_msg(first_name):
     return f"""🛠️ Направь свой запрос

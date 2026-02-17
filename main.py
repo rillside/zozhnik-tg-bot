@@ -66,19 +66,21 @@ def error_handler(func):
 @bot.message_handler(commands=['start'])
 # @error_handler
 async def start(message):
+    user_is_admin = await is_admin(message.chat.id)
     logging.info(f"Пользователь {message.chat.id} запустил бота")
     if is_owner(message.chat.id):
         await add_user(message.chat.id, message.from_user.username,
                  'Owner')
 
     else:
+
         await add_user(message.chat.id, message.from_user.username,
-                 f"{'Admin' if is_admin(message.chat.id) else 'User'}")
+                 f"{'Admin' if user_is_admin else 'User'}")
     if await get_timezone(message.chat.id) is not None:
         await bot.send_message(
             message.chat.id,
             start_message(message.from_user.first_name),
-            reply_markup=main_menu(message.chat.id)
+            reply_markup=main_menu(message.chat.id,user_is_admin)
         )
     else:
         await bot.send_message(message.chat.id,
@@ -136,7 +138,7 @@ async def msg(message):
             )
 
         case "📊 Статистика пользователей" if is_admin(message.chat.id):
-            await bot.send_message(message.chat.id, adm_stats())
+            await bot.send_message(message.chat.id, await adm_stats())
         case '📢 Рассылка' if is_admin(message.chat.id):
             await bot.send_message(message.chat.id,
                              example_broadcast, reply_markup=cancel_br_start())
@@ -153,9 +155,10 @@ async def msg(message):
         case "👑 Управление администрацией" if is_owner(message.chat.id):
             await bot.send_message(message.chat.id, await owner_stats(), reply_markup=owner_menu())
         case "↩️ На главную":
+            user_is_admin = await is_admin(message.chat.id)
             await bot.send_message(
                 message.chat.id, exit_home(),
-                reply_markup=main_menu(message.chat.id)
+                reply_markup=main_menu(message.chat.id,user_is_admin)
             )
         case _:
             await bot.send_message(message.chat.id, nf_cmd)
@@ -262,10 +265,11 @@ async def callback_inline(call):
             )
         case 'cancel_settings' | 'water_add_exit':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+            user_is_admin = await is_admin(call.message.chat.id)
             await bot.send_message(
                 call.message.chat.id,
                 exit_home(),
-                reply_markup=main_menu(call.message.chat.id)
+                reply_markup=main_menu(call.message.chat.id,user_is_admin)
             )
         case data if ((data == 'water_add_custom'
                        or data == 'water_add_custom_cancel')
@@ -300,8 +304,9 @@ async def callback_inline(call):
             )
         case 'supp_exit':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+            user_is_admin = await is_admin(call.message.chat.id)
             await bot.send_message(call.message.chat.id, exit_home(),
-                             reply_markup=main_menu(call.message.chat.id))
+                             reply_markup=main_menu(call.message.chat.id,user_is_admin))
         case data if data.startswith('accept_ticket_'):
             id_ticket = data.split('_')[2]
             await bot.answer_callback_query(call.id, opening_ticket_msg)
