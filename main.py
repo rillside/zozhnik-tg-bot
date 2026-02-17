@@ -3,9 +3,8 @@ import telebot
 from telebot.async_telebot import AsyncTeleBot
 from functools import wraps
 import logging
-import time
 from requests.exceptions import ReadTimeout, ConnectionError
-from database import init_db, add_user, update_user_activity_smart, get_all_admin, update_username, \
+from database import init_db, add_user, update_user_activity_smart, update_username, \
     count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info
 from handlers.broadcast import broadcast_send, accept_broadcast
 from handlers.owner_menu import add_admin, remove_admin, return_admin

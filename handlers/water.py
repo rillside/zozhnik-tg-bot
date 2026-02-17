@@ -7,7 +7,7 @@ from messages import water_custom_input_accept_msg, water_custom_input_limit_msg
     water_add_hard_limit_msg, water_add_reasonable_limit_msg
 
 
-def validate_water_addition(info, added_water_ml):
+async def validate_water_addition(info, added_water_ml):
     # Константы
     min_interval = 15  # минут между записями
     daily_reasonable_limit = 5000  # мл за день (5 литров) - разумный максимум
@@ -30,28 +30,28 @@ def validate_water_addition(info, added_water_ml):
     return True, None
 
 
-def handle_add_water(call, bot, step):
+async def handle_add_water(call, bot, step):
     if step == 'addition':
         water_add = call.data.split('_')[2]
-        accept, msg = validate_water_addition(get_water_stats_for_today(call.message.chat.id), water_add)
+        accept, msg = await validate_water_addition(await get_water_stats_for_today(call.message.chat.id), water_add)
 
         if accept:
-            update_last_add_water_ml(call.message.chat.id)
-            add_water_ml(call.message.chat.id, water_add)
-            bot.answer_callback_query(call.id, add_water_msg)
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            current_goal, water_drunk = water_stats(call.message.chat.id)
-            bot.send_message(call.message.chat.id,
+            await update_last_add_water_ml(call.message.chat.id)
+            await add_water_ml(call.message.chat.id, water_add)
+            await bot.answer_callback_query(call.id, add_water_msg)
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            current_goal, water_drunk = await water_stats(call.message.chat.id)
+            await bot.send_message(call.message.chat.id,
                              water_tracker_dashboard_msg(
                                  call.from_user.first_name,
                                  current_goal, water_drunk),
                              reply_markup=water_add_keyboard()
                              )
         if msg:
-            bot.send_message(call.message.chat.id, msg)
+            await bot.send_message(call.message.chat.id, msg)
     elif step == 'request_value':
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id,
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(call.message.chat.id,
                          water_add_custom_input_msg(
                              call.message.from_user.first_name),
                          reply_markup=cancel_custom_add_water_keyboard()
@@ -61,11 +61,11 @@ def handle_add_water(call, bot, step):
             lambda msg: add_custom_water(msg, bot)
         )
     elif step == 'custom_cancel':
-        bot.clear_step_handler_by_chat_id(call.message.chat.id)
-        bot.answer_callback_query(call.id, cancellation, show_alert=False)
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        current_goal, water_drunk = water_stats(call.message.chat.id)
-        bot.send_message(call.message.chat.id,
+        await bot.clear_step_handler_by_chat_id(call.message.chat.id)
+        await bot.answer_callback_query(call.id, cancellation, show_alert=False)
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        current_goal, water_drunk = await water_stats(call.message.chat.id)
+        await bot.send_message(call.message.chat.id,
                          water_tracker_dashboard_msg(
                              call.message.from_user.first_name,
                              current_goal, water_drunk),
@@ -73,22 +73,22 @@ def handle_add_water(call, bot, step):
                          )
 
 
-def add_custom_water(message, bot):
+async def add_custom_water(message, bot):
     ml = message.text.strip()
     if ml.isdigit():
         if 50 <= int(ml) <= 1500:
-            bot.send_message(message.chat.id,
+            await bot.send_message(message.chat.id,
                              water_custom_input_accept_msg(ml),
                              reply_markup=
                              accept_custom_add_water_keyboard(ml)
                              )
             return
         else:
-            bot.send_message(message.chat.id, water_custom_input_limit_msg(ml),
+            await bot.send_message(message.chat.id, water_custom_input_limit_msg(ml),
                              reply_markup=cancel_custom_add_water_keyboard()
                              )
     else:
-        bot.send_message(message.chat.id, water_custom_input_format_error_msg,
+        await bot.send_message(message.chat.id, water_custom_input_format_error_msg,
                          reply_markup=cancel_custom_add_water_keyboard()
                          )
     bot.register_next_step_handler_by_chat_id(message.chat.id, lambda msg: add_custom_water(msg, bot))
