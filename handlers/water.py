@@ -5,6 +5,7 @@ from keyboards import accept_custom_add_water_keyboard, cancel_custom_add_water_
 from messages import water_custom_input_accept_msg, water_custom_input_limit_msg, water_custom_input_format_error_msg, \
     add_water_msg, water_tracker_dashboard_msg, water_add_custom_input_msg, cancellation,water_add_time_limit_msg, \
     water_add_hard_limit_msg, water_add_reasonable_limit_msg
+from utils.fsm import set_state, clear_state
 
 
 async def validate_water_addition(info, added_water_ml):
@@ -56,12 +57,9 @@ async def handle_add_water(call, bot, step):
                              call.message.from_user.first_name),
                          reply_markup=cancel_custom_add_water_keyboard()
                          )
-        bot.register_next_step_handler_by_chat_id(
-            call.message.chat.id,
-            lambda msg: add_custom_water(msg, bot)
-        )
+        set_state(call.message.chat.id,'waiting_add_water',None)
     elif step == 'custom_cancel':
-        await bot.clear_step_handler_by_chat_id(call.message.chat.id)
+        clear_state(call.message.chat.id)
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         current_goal, water_drunk = await water_stats(call.message.chat.id)
@@ -82,6 +80,7 @@ async def add_custom_water(message, bot):
                              reply_markup=
                              accept_custom_add_water_keyboard(ml)
                              )
+            clear_state(message.chat.id)
             return
         else:
             await bot.send_message(message.chat.id, water_custom_input_limit_msg(ml),
@@ -91,4 +90,3 @@ async def add_custom_water(message, bot):
         await bot.send_message(message.chat.id, water_custom_input_format_error_msg,
                          reply_markup=cancel_custom_add_water_keyboard()
                          )
-    bot.register_next_step_handler_by_chat_id(message.chat.id, lambda msg: add_custom_water(msg, bot))

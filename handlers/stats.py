@@ -27,6 +27,4 @@ async def adm_stats():
 
 async def owner_stats():
     admins =  await get_all_admin()
-    event_loop = asyncio.get_event_loop()
-    res = event_loop.run_in_executor(None, owner_stats_msg, admins)
-    return res
+    return await asyncio.to_thread(owner_stats_msg, admins)

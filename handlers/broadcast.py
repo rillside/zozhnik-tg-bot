@@ -7,6 +7,7 @@ from handlers.admin_notifications import admin_censorship_violation
 from keyboards import accept_send
 from messages import broadcast_stats
 from utils.censorship.checker import censor_check, removal_of_admin_rights
+from utils.fsm import clear_state
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,7 +32,8 @@ async def broadcast_send(call, bot):
     sender = '@' + sender_username if sender_username is not None else sender_id
     unsucc = 0
     succ = 0
-    if censor_check(message):
+    if await censor_check(message):
+        clear_state(call.message.chat.id)
         for i in await all_users():
             try:
                 await bot.send_message(

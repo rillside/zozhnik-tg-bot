@@ -6,6 +6,7 @@ from messages import  water_goal_limit_msg, water_goal_success_msg, water_goal_s
     water_tracker_setup_msg, water_goal_incorrect_format_msg, water_reminder_type_selection_msg, \
     water_setup_required_msg, water_reminder_type_smart_msg, water_interval_selected_short_msg, cancellation, \
     timezone_suc_msg, start_message, water_goal_custom_msg
+from utils.fsm import clear_state, set_state, user_states
 
 
 async def select_timezone(call, bot):
@@ -74,6 +75,7 @@ async def water_goal_custom_stg(bot, message, call, send_msg):
     ml = message.text.strip()
     if ml.replace('.', '', 1).isdigit():
         if 500 <= float(ml) <= 8000:
+            clear_state(call.message.chat.id)
             await update_water_goal(call.from_user.id, ml)
             await bot.send_message(call.message.chat.id, water_goal_success_msg(ml))
             await bot.delete_message(message.chat.id, send_msg.message_id)
@@ -88,18 +90,12 @@ async def water_goal_custom_stg(bot, message, call, send_msg):
             await bot.delete_message(message.chat.id, send_msg.message_id)
             send_msg = await bot.send_message(message.chat.id, water_goal_limit_msg,
                                         reply_markup=water_goal_custom_cancel())
-            bot.register_next_step_handler_by_chat_id(
-                call.message.chat.id,
-                lambda msg: water_goal_custom_stg(bot, msg, call, send_msg)
-            )
+            set_state(call.message.chat.id,'waiting_custom_water_goal',[call,send_msg])
     else:
         await bot.delete_message(message.chat.id, send_msg.message_id)
         send_msg = await bot.send_message(message.chat.id, water_goal_incorrect_format_msg,
                                     reply_markup=water_goal_custom_cancel())
-        bot.register_next_step_handler_by_chat_id(
-            call.message.chat.id,
-            lambda msg: water_goal_custom_stg(bot, msg, call, send_msg)
-        )
+        set_state(call.message.chat.id,'waiting_custom_water_goal',[call,send_msg])
 
 
 async def water_goal_settings(call, bot, step):
@@ -119,10 +115,7 @@ async def water_goal_settings(call, bot, step):
             call.message.chat.id,
             water_goal_custom_msg, reply_markup=water_goal_custom_cancel()
         )
-        bot.register_next_step_handler_by_chat_id(
-            call.message.chat.id,
-            lambda msg: water_goal_custom_stg(bot, msg, call, send_custom_selection_msg)
-        )
+        set_state(call.message.chat.id, 'waiting_custom_water_goal', [call, send_custom_selection_msg])
     elif step == 'exit':
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
@@ -134,7 +127,7 @@ async def water_goal_settings(call, bot, step):
     elif step == 'cancel_custom':
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
-        await bot.clear_step_handler_by_chat_id(call.message.chat.id)
+        clear_state(call.message.chat.id)
         await bot.send_message(call.message.chat.id,
                          water_goal_selection_msg(call.from_user.first_name),
                          reply_markup=water_goal_keyboard()

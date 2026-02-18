@@ -30,7 +30,7 @@ def main_menu(user_id,is_admin):  # Основная клавиатура
     keyboard.add("💧 Водный баланс")
     keyboard.add("💪 Физ-активность", "😴 Сон")
     keyboard.add("📊 Статистика", "⚙️ Настройки")
-    if is_admin(user_id):
+    if is_admin:
         keyboard.add("👨‍⚕️ Персональный специалист",
                      "🛠️ Админ панель")
     else:
@@ -49,11 +49,11 @@ def admin_menu(id):  # Основная Клавиатура администр�
     return keyboard
 
 
-def owner_menu():  # Клавиатура Для владельцев
+def owner_menu(admins):  # Клавиатура Для владельцев
     keyboard = types.InlineKeyboardMarkup()
     btn_add = types.InlineKeyboardButton("⚡ Добавить администратора", callback_data='add_adm')
     keyboard.add(btn_add)
-    if get_all_admin():
+    if admins:
         btn_remove = types.InlineKeyboardButton("🚫 Удалить администратора", callback_data='remove_adm')
         keyboard.add(btn_remove)
     return keyboard

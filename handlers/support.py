@@ -1,5 +1,4 @@
 import asyncio
-import time
 from datetime import datetime, timedelta
 
 from utils.censorship.checker import censor_check, removal_of_admin_rights
@@ -13,6 +12,8 @@ from messages import aggressive_content_warning_msg, succ_ticket_title_msg, open
     admin_open_ticket_msg, ticket_limit_error_msg, upload_photo_error, notify_new_message_in_ticket, \
     error_ticket_opening_msg, ticket_closed_msg, confirm_delete_ticket_msg, cancellation, my_tickets_msg, \
     no_active_tickets_msg, admin_tickets_msg, support_selection_msg, admin_ticket_section_msg
+from utils.fsm import clear_state, set_state
+
 
 async def opening_ticket(message, bot, id_ticket, role):
     max_char = 3800
@@ -22,11 +23,11 @@ async def opening_ticket(message, bot, id_ticket, role):
         await bot.send_message(message.chat.id, error_ticket_opening_msg)
         return
     if role == 'user':
-        text_msg = await open_ticket_msg(id_ticket, title, type_ticket, created_date, update_date,
+        text_msg = open_ticket_msg(id_ticket, title, type_ticket, created_date, update_date,
                                    message_history)
 
     else:
-        text_msg = await admin_open_ticket_msg(id_ticket, title, user_id, username, first_name,
+        text_msg = admin_open_ticket_msg(id_ticket, title, user_id, username, first_name,
                                          status_for_admin,
                                          type_ticket, created_date,
                                          update_date, message_history)
@@ -55,10 +56,7 @@ async def opening_ticket(message, bot, id_ticket, role):
 
     if await get_ticket_status(id_ticket, role) == 'new':
         await replace_ticket_status(id_ticket, 'no_new', role)
-    bot.register_next_step_handler_by_chat_id(message.chat.id,
-                                              lambda msg: send_message_to_ticket(msg, bot, id_ticket, role, last_msg,
-                                                                                 type_ticket, user_id)
-                                              )
+    set_state(message.chat.id,'waiting_send_msg_to_ticket',[id_ticket,role,last_msg,type_ticket,user_id])
 
 async def handle_delete_ticket(call, bot, type_handle):
     await bot.delete_message(call.message.chat.id, call.message_id)
@@ -78,7 +76,7 @@ async def handle_delete_ticket(call, bot, type_handle):
         await bot.answer_callback_query(call.id, cancellation)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         await opening_ticket(call.message, bot, id_ticket, 'user')
-        bot.clear_step_handler_by_chat_id(call.message.chat.id)
+        clear_state(call.message.chat.id)
 
 
 async def handling_aggressive_content(call, bot, content_type):
@@ -110,10 +108,6 @@ async def handling_aggressive_content(call, bot, content_type):
 async def create_ticket(message, bot, type_ticket):
     if len(message.text) > 50:
         await bot.send_message(message.chat.id, ticket_limit_error_msg())
-        bot.register_next_step_handler_by_chat_id(
-            message.chat.id,
-            lambda msg: create_ticket(msg, bot, type_ticket)
-        )
     else:
         if await censor_check(message.text):
             id_ticket = await add_ticket(message.text, message.chat.id,
@@ -181,7 +175,7 @@ async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_t
 
 
 async def ticket_exit(call, bot):
-    bot.clear_step_handler_by_chat_id(call.message.chat.id)
+    clear_state(call.message.chat.id)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     role = 'admin' if call.data.split('_')[-2] == 'admin' else 'user'
     try:
