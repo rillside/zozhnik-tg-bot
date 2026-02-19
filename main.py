@@ -114,24 +114,27 @@ _locks = {}
 @bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
 async def handle_photo_with_state(message):
     state, data = get_state(message.chat.id)
+    async with _locks.setdefault(message.chat.id, asyncio.Lock()):
+        if message.media_group_id:
+            group_id = message.media_group_id
+            if not is_group_warned(group_id):
+                await bot.send_message(
+                    message.chat.id,
+                    send_media_group_error_msg,
+                    reply_markup=cancel_br_start()
+                )
+                mark_group_warned(group_id)
+
+            return
+    photo = message.photo[-1]
+    file_id = photo.file_id
+    caption = message.caption if message.caption else None
     match state:
         case 'waiting_broadcast_text':
-            async with _locks.setdefault(message.chat.id, asyncio.Lock()):
-                if message.media_group_id:
-                    group_id = message.media_group_id
-                    if not is_group_warned(group_id):
-                        await bot.send_message(
-                            message.chat.id,
-                            send_media_group_error_msg,
-                            reply_markup=cancel_br_start()
-                        )
-                        mark_group_warned(group_id)
-
-                    return
-            photo = message.photo[-1]
-            file_id = photo.file_id
-            caption = message.caption if message.caption else None
             await accept_broadcast(message, bot,'photo', file_id,caption)
+        case 'waiting_send_msg_to_ticket':
+            await send_message_to_ticket(message,bot,*data,type_msg='photo',file_id=file_id,caption=caption)
+
 
 
 

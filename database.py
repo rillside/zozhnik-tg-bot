@@ -85,6 +85,8 @@ async def init_db():
                 ticket_id INTEGER,    
                 text TEXT,              
                 is_from_user BOOLEAN,
+                type_msg TEXT DEFAULT 'string',
+                file_id TEXT DEFAULT NULL,
                 date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             ''')
@@ -378,7 +380,7 @@ async def add_ticket(title, user_id, username, first_name, type_supp):
         cursor = await conn.execute('''INSERT INTO tickets (title,user_id,username,first_name,type)
                       VALUES (?,?,?,?,?)''',
                                     (title, user_id, username, first_name, type_supp))
-        ticket_id = await cursor.lastrowid
+        ticket_id = cursor.lastrowid
     return ticket_id
 
 
@@ -388,12 +390,18 @@ async def delete_ticket(ticket_id):
                            (ticket_id,))
 
 
-async def send_supp_msg(ticket_id, text, is_from_user):
+async def send_supp_msg(ticket_id, text, is_from_user,type_msg='string',file_id=None):
     async with get_connection() as conn:
-        await conn.execute('''INSERT INTO messages
-                     (ticket_id, text, is_from_user)
-                     VALUES ( ?, ?, ?)''',
-                           (ticket_id, text, is_from_user))
+        if type_msg == 'string':
+            await conn.execute('''INSERT INTO messages
+                         (ticket_id, text, is_from_user)
+                         VALUES ( ?, ?, ?,?)''',
+                               (ticket_id, text, is_from_user))
+        else:
+            await conn.execute('''INSERT INTO messages 
+                                (ticket_id, text, is_from_user,type_msg,file_id)
+                                VALUES ( ?, ?, ?,?,?)''',
+                               (ticket_id,text,is_from_user,type_msg,file_id))
         await conn.execute('''UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?''',
                            (ticket_id,))
 

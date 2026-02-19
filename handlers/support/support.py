@@ -34,19 +34,20 @@ async def opening_ticket(message, bot, id_ticket, role):
 
     if len(text_msg) <= max_char:
         last_msg = await bot.send_message(message.chat.id,
-                                    text_msg,
-                                    reply_markup=ticket_exit_keyboard(role=role, type=type_ticket, id_ticket=id_ticket)
-                                    )
+                                          text_msg,
+                                          reply_markup=ticket_exit_keyboard(role=role, type=type_ticket,
+                                                                            id_ticket=id_ticket)
+                                          )
     else:
         messages_id = []
         count_msg = -(-len(text_msg) // max_char)  # к большему
         for i in range(1, count_msg + 1):
             if i == count_msg:
                 last_msg = await bot.send_message(message.chat.id,
-                                            text_msg[max_char * (i - 1):max_char * i + 1],
-                                            reply_markup=ticket_exit_keyboard(messages_id, role, type=type_ticket,
-                                                                              id_ticket=id_ticket)
-                                            )
+                                                  text_msg[max_char * (i - 1):max_char * i + 1],
+                                                  reply_markup=ticket_exit_keyboard(messages_id, role, type=type_ticket,
+                                                                                    id_ticket=id_ticket)
+                                                  )
             else:
                 messages_id.append(await bot.send_message(
                     message.chat.id,
@@ -56,7 +57,8 @@ async def opening_ticket(message, bot, id_ticket, role):
 
     if await get_ticket_status(id_ticket, role) == 'new':
         await replace_ticket_status(id_ticket, 'no_new', role)
-    set_state(message.chat.id,'waiting_send_msg_to_ticket',[id_ticket,role,last_msg,type_ticket,user_id])
+    set_state(message.chat.id, 'waiting_send_msg_to_ticket', [id_ticket, role, last_msg, type_ticket, user_id])
+
 
 async def handle_delete_ticket(call, bot, type_handle):
     await bot.delete_message(call.message.chat.id, call.message_id)
@@ -85,12 +87,12 @@ async def handling_aggressive_content(call, bot, content_type):
         if call.data.split('_')[2] == 'accept':
             title, type_ticket = call.data.split('_')[3], call.data.split('_')[4]
             id_ticket = await add_ticket(title, call.message.chat.id,
-                                   call.message.from_user.username,
-                                   call.message.from_user.first_name,
-                                   type_ticket
-                                   )
+                                         call.message.from_user.username,
+                                         call.message.from_user.first_name,
+                                         type_ticket
+                                         )
             await bot.send_message(call.message.chat.id, succ_ticket_title_msg,
-                             reply_markup=supp_ticket_draft_keyboard(id_ticket))
+                                   reply_markup=supp_ticket_draft_keyboard(id_ticket))
             await new_ticket_notify(bot, id_ticket, call.message.chat.id, type_ticket)
         else:
             await bot.send_message(call.message.chat.id, ticket_closed_msg())
@@ -111,10 +113,11 @@ async def create_ticket(message, bot, type_ticket):
     else:
         if await censor_check(message.text):
             id_ticket = await add_ticket(message.text, message.chat.id,
-                                   message.from_user.username,
-                                   message.from_user.first_name, type_ticket)
+                                         message.from_user.username,
+                                         message.from_user.first_name, type_ticket)
+            await bot.delete_message(message.chat.id, message.message_id)
             await bot.send_message(message.chat.id, succ_ticket_title_msg,
-                             reply_markup=supp_ticket_draft_keyboard(id_ticket))
+                                   reply_markup=supp_ticket_draft_keyboard(id_ticket))
             await new_ticket_notify(bot, id_ticket, message.chat.id, type_ticket)
 
         else:
@@ -125,52 +128,54 @@ async def create_ticket(message, bot, type_ticket):
             )
 
 
-
-async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_ticket, user_id):
+async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_ticket, user_id, type_msg='message',
+                                 file_id=None, caption=None):
     try:
         await bot.delete_message(message.chat.id, message.message_id)
         await bot.delete_message(message.chat.id, last_msg.message_id)
     except Exception:
         pass
-    if type(message.text) == str:
-        if len(message.text) <= 1000:
-            if await censor_check(message.text):
-                is_from_user = 1 if role == 'user' else 0
-                await send_supp_msg(ticket_id, message.text, is_from_user)
-                info = await load_info_by_ticket(ticket_id)
-                last_update = info[0][-1]
-                server_time = datetime.fromisoformat(last_update) + timedelta(hours=3)
-                if datetime.now() - server_time >= timedelta(hours=1):
-                    if role == 'user':
-                        await new_message_in_ticket_notify(bot, ticket_id, type_ticket)
-                    else:
-                        await bot.send_message(user_id,
-                                         notify_new_message_in_ticket(ticket_id),
-                                         reply_markup=go_to_ticket_keyboard(ticket_id, 'user')
-                                         )
-                role_recipient = 'user' if role == 'admin' else 'admin'
-                if await get_ticket_status(ticket_id, role_recipient) == 'no_new':
-                    await replace_ticket_status(ticket_id, 'new', role_recipient)
-            else:
-                if role == 'user':
-                    await bot.send_message(message.chat.id,
-                                     aggressive_content_warning_msg('сообщении'),
-                                     reply_markup=
-                                     accept_aggressive_msg_keyboard(
-                                         ticket_id, message.text)
-                                     )
-                    return
-                else:
-                    await removal_of_admin_rights(bot, message.text,
-                                            message.chat.id,
-                                            message.from_user.username,
-                                            'supp'
-                                            )
-                    return
-        else:
-            await bot.send_message(message.chat.id, ticket_limit_error_msg(1000, 'сообщение'))
+    if type_msg == 'message':
+        text = message.text
     else:
-        await bot.send_message(message.chat.id, upload_photo_error)
+        text = caption if caption else ''
+    if len(text) <= 1000:
+        if await censor_check(text):
+            is_from_user = 1 if role == 'user' else 0
+            await send_supp_msg(ticket_id, text, is_from_user,type_msg,file_id)
+            info = await load_info_by_ticket(ticket_id)
+            last_update = info[0][-1]
+            server_time = datetime.fromisoformat(last_update) + timedelta(hours=3)
+            if datetime.now() - server_time >= timedelta(hours=1):
+                if role == 'user':
+                    await new_message_in_ticket_notify(bot, ticket_id, type_ticket)
+                else:
+                    await bot.send_message(user_id,
+                                           notify_new_message_in_ticket(ticket_id),
+                                           reply_markup=go_to_ticket_keyboard(ticket_id, 'user')
+                                           )
+            role_recipient = 'user' if role == 'admin' else 'admin'
+            if await get_ticket_status(ticket_id, role_recipient) == 'no_new':
+                await replace_ticket_status(ticket_id, 'new', role_recipient)
+        else:
+            if role == 'user':
+                await bot.send_message(message.chat.id,
+                                       aggressive_content_warning_msg('сообщении'),
+                                       reply_markup=
+                                       accept_aggressive_msg_keyboard(
+                                           ticket_id, text)
+                                       )
+                return
+            else:
+                await removal_of_admin_rights(bot, text,
+                                              message.chat.id,
+                                              message.from_user.username,
+                                              'supp'
+                                              )
+                return
+    else:
+        await bot.send_message(message.chat.id, ticket_limit_error_msg(1000, 'сообщение'))
+
     await opening_ticket(message, bot, ticket_id, role)
 
 
@@ -198,10 +203,11 @@ async def ticket_exit(call, bot):
         type_supp = call.data.split('_')[-1]
         if await count_tickets_for_admin(type_supp):
             await bot.send_message(call.message.chat.id
-                             , admin_tickets_msg(type_supp),
-                             reply_markup=
-                             opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp)
-                                                     ))
+                                   , admin_tickets_msg(type_supp),
+                                   reply_markup=
+                                   opening_ticket_keyboard('admin',
+                                                           await load_tickets_info(role='admin', type=type_supp)
+                                                           ))
         else:
             await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
 
@@ -211,14 +217,14 @@ async def tickets_exit(call, bot):
     if call.data.split('_')[2] == 'user':
         await bot.send_message(call.message.chat.id, support_selection_msg(
             call.message.from_user.first_name),
-                         reply_markup=support_selection_keyboard()
-                         )
+                               reply_markup=support_selection_keyboard()
+                               )
     else:
         await bot.send_message(call.message.chat.id,
-                         admin_ticket_section_msg(
-                             call.message.from_user.first_name),
-                         reply_markup=admin_ticket_section_keyboard()
-                         )
+                               admin_ticket_section_msg(
+                                   call.message.from_user.first_name),
+                               reply_markup=admin_ticket_section_keyboard()
+                               )
 
 
 async def look_ticket_page(call, bot):
@@ -231,10 +237,10 @@ async def look_ticket_page(call, bot):
         text = my_tickets_msg
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     await bot.send_message(call.message.chat.id, text,
-                     reply_markup=opening_ticket_keyboard(
-                         role, await load_tickets_info(call.message.chat.id, role=role, type=type),
-                         int(page))
-                     )
+                           reply_markup=opening_ticket_keyboard(
+                               role, await load_tickets_info(call.message.chat.id, role=role, type=type),
+                               int(page))
+                           )
 
 
 async def admin_look_tickets(call, bot):
@@ -242,9 +248,9 @@ async def admin_look_tickets(call, bot):
     type_supp = call.data.split('_')[2]
     if await count_tickets_for_admin(type_supp):
         await bot.send_message(call.message.chat.id
-                         , admin_tickets_msg(type_supp),
-                         reply_markup=
-                         opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp)
-                                                 ))
+                               , admin_tickets_msg(type_supp),
+                               reply_markup=
+                               opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp)
+                                                       ))
     else:
         await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
