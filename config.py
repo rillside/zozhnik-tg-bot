@@ -16,7 +16,7 @@ def load_owners():
 load_dotenv()
 token = os.getenv('token_bot')  # Токен бота
 if not token:
-    raise ValueError("❌ BOT_TOKEN не найден в .env файле!")
+    raise ValueError("BOT_TOKEN не найден в .env файле!")
 owners = load_owners()
 owners_copy = owners[:]
 ai_censor_enabled = False

@@ -1,8 +1,7 @@
 from telebot import types
 
 from config import is_owner
-from database import get_all_admin
-from utils.ticket_sorting import sort_ticket
+from handlers.support.ticket_sorting import sort_ticket
 
 
 def timezone_selection_keyboard():
@@ -80,10 +79,10 @@ def return_admin_rights():
     return keyboard
 
 
-def accept_send():
+def accept_send(type_broadcast = 'msg'):
     keyboard = types.InlineKeyboardMarkup()
-    btn_accept = types.InlineKeyboardButton("✅ Отправить рассылку", callback_data='br_accept')
-    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data='br_cancel')
+    btn_accept = types.InlineKeyboardButton("✅ Отправить рассылку", callback_data=f'br_accept_{type_broadcast}')
+    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'br_cancel')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
 

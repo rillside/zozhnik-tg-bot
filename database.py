@@ -3,6 +3,7 @@ import aiosqlite
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
+
 @asynccontextmanager
 async def get_connection():
     conn = None
@@ -23,7 +24,6 @@ async def get_connection():
             await conn.close()
 
 
-
 async def init_db():
     async with get_connection() as conn:
         await conn.execute('''
@@ -39,6 +39,7 @@ async def init_db():
         await conn.execute('''
                 CREATE TABLE IF NOT EXISTS track_water (
                     user_id INTEGER PRIMARY KEY,
+                    timezone INTEGER,
                     broadcast_type TEXT,
                     broadcast_interval TIME,
                     last_broadcast TIMESTAMP,
@@ -51,8 +52,18 @@ async def init_db():
                     Saturday TEXT DEFAULT 0,
                     Sunday TEXT DEFAULT 0,
                     Total TEXT DEFAULT 0,
-                    last_update TIMESTAMP
+                    last_update TIMESTAMP,
+                    last_reset TEXT
                 )
+            ''')
+        await conn.execute('''
+        CREATE TABLE IF NOT EXISTS water_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            week_start TEXT
+            )
             ''')
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS tickets (
@@ -96,10 +107,8 @@ async def add_user(user_id, username, status):
             ''', (user_id, username, status))
             await conn.execute('''INSERT INTO track_water (user_id)
                               VALUES (?) '''
-                           , (user_id,))
+                               , (user_id,))
             logging.info(f"Added new user: {user_id} - {'@' + username} - {status}")
-
-    
 
 
 async def all_users():
@@ -130,8 +139,6 @@ async def update_user_activity_smart(user_id):
             last_activity < datetime('now', '-1 hours')
         )
         ''', (user_id,))
-    
-    
 
 
 async def get_active_users_count(days=4):
@@ -151,7 +158,7 @@ async def get_user_status(user_id=None, username=None):
         if user_id:
             await cursor.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
             result = await cursor.fetchone()
-            
+
         elif username:
             await cursor.execute('SELECT status FROM users WHERE username = ?', (username,))
             result = await cursor.fetchone()
@@ -196,13 +203,10 @@ async def replace_status(status, user_id=None, username=None):
 
         if user_id:
             await cursor.execute('UPDATE users SET status = ? WHERE user_id = ?',
-                           (status, user_id))
+                                 (status, user_id))
         elif username:
             await cursor.execute('UPDATE users SET status = ? WHERE username = ?',
-                           (status, username))
-
-    
-    
+                                 (status, username))
 
 
 async def get_id_by_username(username):
@@ -224,11 +228,10 @@ async def update_username(user_id, username, bot):
     if old_username != username:
         async with get_connection() as conn:
             await conn.execute(
-            'UPDATE users SET username = ? WHERE user_id = ?',
-            (username, user_id)
+                'UPDATE users SET username = ? WHERE user_id = ?',
+                (username, user_id)
             )
-        
-        
+
         if await get_user_status(user_id) == 'Admin':
             from handlers.admin_notifications import admin_update_notification
             await admin_update_notification(bot, user_id, old_username, username)
@@ -238,32 +241,30 @@ async def water_set_reminder_type(user_id, broadcast_type, broadcast_interval=No
     async with get_connection() as conn:
         cursor = await conn.cursor()
         if broadcast_type == "Smart":
-            await cursor.execute('UPDATE track_water SET broadcast_type = ?, broadcast_interval = NULL WHERE user_id = ?',
-                           (broadcast_type, user_id)
-                           )
+            await cursor.execute(
+                'UPDATE track_water SET broadcast_type = ?, broadcast_interval = NULL WHERE user_id = ?',
+                (broadcast_type, user_id)
+                )
 
         else:
             await cursor.execute('UPDATE track_water SET broadcast_type = ?, broadcast_interval = ? WHERE user_id = ?',
-                           (broadcast_type, broadcast_interval, user_id)
-                           )
+                                 (broadcast_type, broadcast_interval, user_id)
+                                 )
         await cursor.execute('UPDATE track_water SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?',
-                       (user_id, ))
-    
-    
+                             (user_id,))
+
+
 async def update_reminder_sent_time(user_id):
     async with get_connection() as conn:
         await conn.execute('''UPDATE track_water SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?''',
-                   (user_id, ))
-    
-    
+                           (user_id,))
+
 
 async def update_water_goal(user_id, new_goal):
     async with get_connection() as conn:
         await conn.execute('UPDATE track_water SET goal_ml = ? WHERE user_id = ?',
-                   (new_goal, user_id)
-                   )
-    
-    
+                           (new_goal, user_id)
+                           )
 
 
 async def count_users_trackers(db_table, column_name, user_id=None):
@@ -285,14 +286,21 @@ async def count_users_trackers(db_table, column_name, user_id=None):
     return result[0]
 
 
-async def add_water_ml(user_id, volume_ml):
+async def add_water_ml(user_id, volume_ml,add_total=True):
     today = await get_user_time_now(user_id)
     day_name = today.strftime('%A')
+    now_user_date = today.date()
+    days_since_monday = now_user_date.weekday()
+    last_monday = now_user_date - timedelta(days=days_since_monday)
     async with get_connection() as conn:
-        await conn.execute(f'UPDATE track_water SET {day_name} ={day_name} + ? WHERE user_id = ?',
-                   (volume_ml, user_id))
-    
-    
+        cursor = await conn.cursor()
+        await cursor.execute(f'UPDATE track_water SET {day_name} ={day_name} + ? WHERE user_id = ?',
+                             (volume_ml, user_id))
+        if add_total:
+            await cursor.execute('UPDATE track_water SET Total = Total + ? WHERE user_id = ?',
+                                 (volume_ml, user_id))
+        await cursor.execute('INSERT INTO water_logs (user_id, amount, week_start) VALUES (?, ?, ?) ',
+                             (user_id, volume_ml, last_monday))
 
 
 async def water_stats(user_id):
@@ -307,8 +315,7 @@ async def water_stats(user_id):
 async def set_timezone(user_id, new_timezone):
     async with get_connection() as conn:
         await conn.execute('UPDATE users SET timezone = ? WHERE user_id = ? ', (new_timezone, user_id))
-    
-    
+        await conn.execute('UPDATE track_water SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
 
 
 async def get_timezone(user_id):
@@ -328,9 +335,7 @@ async def get_user_time_now(user_id):
 async def update_last_add_water_ml(user_id):
     async with get_connection() as conn:
         await conn.execute('UPDATE track_water SET last_update = CURRENT_TIMESTAMP WHERE user_id = ?',
-                   (user_id,))
-    
-    
+                           (user_id,))
 
 
 async def get_water_stats_for_today(user_id):
@@ -342,12 +347,37 @@ async def get_water_stats_for_today(user_id):
     return update_time, cnt_water
 
 
+async def fetch_water_stats_all():
+    async with get_connection() as conn:
+        cursor = await conn.cursor()
+        await cursor.execute('''SELECT user_id,goal_ml,timezone,Monday,Tuesday,
+        Wednesday,Thursday,Friday,Saturday,Sunday,last_reset
+         FROM track_water''')
+        return await cursor.fetchall()
+
+
+async def set_last_reset_water(user_id, last_reset):
+    async with get_connection() as conn:
+        await conn.execute('UPDATE track_water SET last_reset = ? WHERE user_id = ?', (last_reset, user_id))
+
+
+async def water_reset(user_id):
+    async with get_connection() as conn:
+        await conn.execute('''UPDATE track_water SET Monday = 0,Tuesday = 0,
+        Wednesday = 0,Thursday = 0,Friday = 0,Saturday = 0,Sunday = 0 WHERE USER_ID = ?''', (user_id,))
+async def get_lost_records_of_water(user_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT id,amount,week_start FROM water_logs WHERE user_id = ?''', (user_id,))
+        return await cursor.fetchall()
+async def delete_water_log(log_id):
+    async with get_connection() as conn:
+        await conn.execute('''DELETE FROM water_logs WHERE id = ?''', (log_id,))
 
 async def add_ticket(title, user_id, username, first_name, type_supp):
     async with get_connection() as conn:
         cursor = await conn.execute('''INSERT INTO tickets (title,user_id,username,first_name,type)
                       VALUES (?,?,?,?,?)''',
-                   (title, user_id, username, first_name, type_supp))
+                                    (title, user_id, username, first_name, type_supp))
         ticket_id = await cursor.lastrowid
     return ticket_id
 
@@ -355,9 +385,7 @@ async def add_ticket(title, user_id, username, first_name, type_supp):
 async def delete_ticket(ticket_id):
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM tickets WHERE id = ?''',
-                   (ticket_id,))
-    
-    
+                           (ticket_id,))
 
 
 async def send_supp_msg(ticket_id, text, is_from_user):
@@ -365,24 +393,25 @@ async def send_supp_msg(ticket_id, text, is_from_user):
         await conn.execute('''INSERT INTO messages
                      (ticket_id, text, is_from_user)
                      VALUES ( ?, ?, ?)''',
-                   (ticket_id, text, is_from_user))
+                           (ticket_id, text, is_from_user))
         await conn.execute('''UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?''',
-                   (ticket_id,))
-    
-    
+                           (ticket_id,))
 
 
 async def tickets_by_user(user_id):
     async with get_connection() as conn:
-        cursor = await conn.execute('SELECT id,status_for_user,type,created_at,updated_at FROM tickets WHERE user_id = ?', (user_id,))
+        cursor = await conn.execute(
+            'SELECT id,status_for_user,type,created_at,updated_at FROM tickets WHERE user_id = ?', (user_id,))
         result = await cursor.fetchone()
     return result
 
+
 async def count_tickets_for_admin(type_ticket):
     async with get_connection() as conn:
-        cursor = await conn.execute('''SELECT COUNT(*) FROM tickets WHERE type = ?''',(type_ticket,))
+        cursor = await conn.execute('''SELECT COUNT(*) FROM tickets WHERE type = ?''', (type_ticket,))
         result = await cursor.fetchone()
     return result[0] if result else 0
+
 
 async def load_info_by_ticket(ticket_id):
     async with get_connection() as conn:
@@ -394,16 +423,17 @@ async def load_info_by_ticket(ticket_id):
     return ticket_info, message_info
 
 
-async def load_tickets_info(user_id=None, role='user',type=None):
+async def load_tickets_info(user_id=None, role='user', type=None):
     async with get_connection() as conn:
         cursor = await conn.cursor()
         if role == 'user':
-            await cursor.execute('''SELECT title,id,status_for_user,updated_at FROM tickets WHERE user_id = ?''', (user_id,))
+            await cursor.execute('''SELECT title,id,status_for_user,updated_at FROM tickets WHERE user_id = ?''',
+                                 (user_id,))
         elif role == 'admin':
-            await cursor.execute('''SELECT title,id,status_for_admin,updated_at FROM tickets WHERE type = ?''', (type,) )
+            await cursor.execute('''SELECT title,id,status_for_admin,updated_at FROM tickets WHERE type = ?''', (type,))
         ticket_list = [list(row) for row in await cursor.fetchall()]
-    
-    return type,ticket_list
+
+    return type, ticket_list
 
 
 async def get_ticket_status(ticket_id, role):
@@ -418,8 +448,8 @@ async def replace_ticket_status(ticket_id, status, role):
     status_column = 'status_for_user' if role == 'user' else 'status_for_admin'
     async with get_connection() as conn:
         await conn.execute(f'''UPDATE tickets SET {status_column} = ? WHERE id = ?''', (status, ticket_id))
-    
-    
+
+
 async def get_users_for_water_reminders():
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT user_id,broadcast_type,broadcast_interval,

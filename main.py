@@ -8,8 +8,9 @@ from database import init_db, add_user, update_user_activity_smart, update_usern
     count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info, get_all_admin
 from handlers.broadcast import broadcast_send, accept_broadcast
 from handlers.owner_menu import add_admin, remove_admin, return_admin
-from handlers.reminders import UniversalReminderService
-from handlers.support import create_ticket, opening_ticket, handle_delete_ticket, \
+from utils.antispam import mark_group_warned, is_group_warned
+from utils.scheduler import Scheduler
+from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
     handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page, send_message_to_ticket
 from handlers.water import handle_add_water, add_custom_water
 from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_cancel, settings_keyboard, \
@@ -22,7 +23,7 @@ from messages import start_message, nf_cmd, adm_start_message, exit_home, exampl
     error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
     water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
     support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
-    my_tickets_msg, admin_ticket_section_msg
+    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg
 from handlers.settings import set_reminder_type_water, water_smart_type_install, \
     water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg
 from handlers.sleeps import sleeps_main
@@ -90,7 +91,7 @@ async def start(message):
                                )
 
 
-@bot.message_handler(func=lambda msg: user_states.get(msg.chat.id) is not None)
+@bot.message_handler(content_types=['text'],func=lambda msg: user_states.get(msg.chat.id) is not None)
 async def state_handler(message):
     state, data = get_state(message.chat.id)
     match state:
@@ -109,8 +110,29 @@ async def state_handler(message):
             await add_custom_water(message, bot)
         case 'waiting_custom_water_goal':
             await water_goal_custom_stg(bot, message, *data)
+_locks = {}
+@bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
+async def handle_photo_with_state(message):
+    state, data = get_state(message.chat.id)
+    match state:
+        case 'waiting_broadcast_text':
+            async with _locks.setdefault(message.chat.id, asyncio.Lock()):
+                if message.media_group_id:
+                    group_id = message.media_group_id
+                    if not is_group_warned(group_id):
+                        await bot.send_message(
+                            message.chat.id,
+                            send_media_group_error_msg,
+                            reply_markup=cancel_br_start()
+                        )
+                        mark_group_warned(group_id)
 
-        
+                    return
+            photo = message.photo[-1]
+            file_id = photo.file_id
+            caption = message.caption if message.caption else None
+            await accept_broadcast(message, bot,'photo', file_id,caption)
+
 
 
 @bot.message_handler(content_types=['text'])
@@ -191,12 +213,20 @@ async def callback_inline(call):
     match call.data:
         case data if data.startswith('timezone_'):
             await select_timezone(call, bot)
-        case 'br_accept':
-            await broadcast_send(call, bot)
+        case data if data.startswith('br_accept_'):
+            type_broadcast = data.split('_')[2]
+            if type_broadcast == 'msg':
+                await broadcast_send(call, bot)
+            elif type_broadcast == 'photo':
+                file_id,caption = get_state(call.message.chat.id)[1]
+                await broadcast_send(call, bot,'photo',file_id,caption)
+            elif type_broadcast == 'media_group':
+                pass
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'br_cancel':
             await bot.send_message(call.message.chat.id, cancellation)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+            clear_state(call.message.chat.id)
         case 'add_adm':
             await bot.send_message(call.message.chat.id, add_new_adm_msg, reply_markup=own_cancel())
             set_state(call.message.chat.id, 'waiting_admin_id', 'add')
@@ -258,7 +288,7 @@ async def callback_inline(call):
                                    reply_markup=water_goal_keyboard()
                                    )
         case data if data.startswith('water_goal_') or data == 'water_reminder_exit':
-            match call.data.split('_')[-1]:
+            match int(call.data.split('_')[-1]):
                 case 1500 | 2000 | 2500 | 3000:
                     step = 'set_goal'
                 case 'custom':
@@ -375,7 +405,7 @@ async def callback_inline(call):
 
 async def start_bot():
     await init_db()
-    reminder_service = UniversalReminderService(bot)
+    reminder_service = Scheduler(bot)
     await reminder_service.start()
     while True:
         try:

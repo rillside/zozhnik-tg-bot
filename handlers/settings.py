@@ -1,3 +1,4 @@
+from config import is_admin
 from database import count_users_trackers, water_set_reminder_type, get_timezone, set_timezone, \
     update_water_goal
 from keyboards import water_goal_keyboard, water_setup_keyboard, water_goal_custom_cancel, \
@@ -16,10 +17,11 @@ async def select_timezone(call, bot):
     await bot.answer_callback_query(call.id, timezone_suc_msg, show_alert=False)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if old_timezone is None:
+        user_is_admin = await is_admin(call.message.chat.id)
         await bot.send_message(
             call.message.chat.id,
             start_message(call.from_user.first_name),
-            reply_markup=main_menu(call.message.chat.id)
+            reply_markup=main_menu(call.message.chat.id,user_is_admin)
         )
 
 
