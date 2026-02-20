@@ -426,7 +426,7 @@ async def load_info_by_ticket(ticket_id):
         cursor = await conn.cursor()
         await cursor.execute('''SELECT * FROM tickets WHERE id = ?''', (ticket_id,))
         ticket_info = await cursor.fetchone()
-        await cursor.execute('''SELECT is_from_user,text FROM messages WHERE ticket_id = ?''', (ticket_id,))
+        await cursor.execute('''SELECT is_from_user,text,type_msg,file_id FROM messages WHERE ticket_id = ?''', (ticket_id,))
         message_info = await cursor.fetchall()
     return ticket_info, message_info
 

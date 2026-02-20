@@ -434,9 +434,12 @@ def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, me
 """
     if messages_history:
 
-        for is_from_user, text in messages_history:
-            sender = "👤 Вы" if is_from_user else "🛠️ Админ"
-            msg += f"\n{sender}: {text}\n"
+        for is_from_user, text,type_msg,file_id in messages_history:
+            sender = "👤 Вы:" if is_from_user else "🛠️ Админ:"
+            if type_msg == 'photo':
+                msg += f"\n{sender}{'\n' + text if text else ''}\n📷 Фото\n"
+            else:
+                msg += f"\n{sender}\n{text}\n"
     else:
         msg += "\n💬 Переписка пока пуста..."
 
@@ -477,9 +480,12 @@ def admin_open_ticket_msg(ticket_id, title, user_id, username, first_name, statu
 
     # История сообщений
     if messages_history:
-        for i, (is_from_user, text) in enumerate(messages_history, 1):
+        for i, (is_from_user, text,type_msg,file_id) in enumerate(messages_history, 1):
             prefix = "👤 Пользователь:" if is_from_user else "🛠️ Администратор:"
-            msg += f"\n{i}. {prefix}\n{text}\n"
+            if type_msg == 'photo':
+                msg += f"\n{i}. {prefix}{'\n'+text if text else ''}\n📷 Фото\n"
+            else:
+                msg += f"\n{i}. {prefix}\n{text}\n"
     else:
         msg += "\n💬 Переписка еще не начата."
 
