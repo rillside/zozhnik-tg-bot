@@ -420,6 +420,7 @@ def aggressive_content_warning_msg(content_type):
 
 
 def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, messages_history):
+    cnt_photo = 0
     # Эмодзи для типа
     type_emoji = "🔧" if type_ticket == 'tech' else "👨‍⚕️"
 
@@ -437,7 +438,8 @@ def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, me
         for is_from_user, text,type_msg,file_id in messages_history:
             sender = "👤 Вы:" if is_from_user else "🛠️ Админ:"
             if type_msg == 'photo':
-                msg += f"\n{sender}{'\n' + text if text else ''}\n📷 Фото\n"
+                cnt_photo +=1
+                msg += f"\n{sender}{'\n' + text if text else ''}\n📷 Фото №{cnt_photo}\n"
             else:
                 msg += f"\n{sender}\n{text}\n"
     else:
@@ -450,6 +452,7 @@ def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, me
 
 def admin_open_ticket_msg(ticket_id, title, user_id, username, first_name, status, type_ticket, created_date,
                           update_date, messages_history):
+    cnt_photo = 0
     # Эмодзи для типа
     type_emoji = "🔧" if type_ticket == 'tech' else "👨‍⚕️"
     type_text = "Техподдержка" if type_ticket == 'tech' else "Консультация"
@@ -483,7 +486,8 @@ def admin_open_ticket_msg(ticket_id, title, user_id, username, first_name, statu
         for i, (is_from_user, text,type_msg,file_id) in enumerate(messages_history, 1):
             prefix = "👤 Пользователь:" if is_from_user else "🛠️ Администратор:"
             if type_msg == 'photo':
-                msg += f"\n{i}. {prefix}{'\n'+text if text else ''}\n📷 Фото\n"
+                cnt_photo +=1
+                msg += f"\n{i}. {prefix}{'\n'+text if text else ''}\n📷 Фото №{cnt_photo}\n"
             else:
                 msg += f"\n{i}. {prefix}\n{text}\n"
     else:
@@ -664,7 +668,7 @@ user_not_admin = "⚠️ Пользователь не является адми
 user_now_admin = "🎉 Поздравляем! Вы были назначены администратором бота!"
 user_removed_admin = "ℹ️ Ваши права администратора были сняты"
 succ_return_adm = '✅ Права восстановлены!'
-
+photo_is_closed_msg = "✅ Фото закрыто!"
 owner_unban = "🔒 Права владельца можно восстановить только через Config file"
 user_return_admin_msg = "ℹ️ Ваши права Администратора восстановлены"
 already_return_adm_msg = "🔄 Права уже были восстановлены"

@@ -429,8 +429,16 @@ async def load_info_by_ticket(ticket_id):
         await cursor.execute('''SELECT is_from_user,text,type_msg,file_id FROM messages WHERE ticket_id = ?''', (ticket_id,))
         message_info = await cursor.fetchall()
     return ticket_info, message_info
-
-
+async def get_photo_ids_by_ticket(ticket_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute("SELECT id FROM messages WHERE ticket_id = ? AND type_msg = 'photo'", (ticket_id,))
+        rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+async def get_photo_file_id(msg_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT file_id FROM messages WHERE id = ?', (msg_id,))
+        result = await cursor.fetchone()
+        return result[0] if result else None
 async def load_tickets_info(user_id=None, role='user', type=None):
     async with get_connection() as conn:
         cursor = await conn.cursor()

@@ -24,7 +24,7 @@ def timezone_selection_keyboard():
     return keyboard
 
 
-def main_menu(user_id,is_admin):  # Основная клавиатура
+def main_menu(user_id, is_admin):  # Основная клавиатура
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add("💧 Водный баланс")
     keyboard.add("💪 Физ-активность", "😴 Сон")
@@ -79,7 +79,7 @@ def return_admin_rights():
     return keyboard
 
 
-def accept_send(type_broadcast = 'msg'):
+def accept_send(type_broadcast='msg'):
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Отправить рассылку", callback_data=f'br_accept_{type_broadcast}')
     btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'br_cancel')
@@ -210,7 +210,7 @@ def supp_ticket_draft_keyboard(id_ticket):
     return keyboard
 
 
-def go_to_ticket_keyboard(ticket_id,role):
+def go_to_ticket_keyboard(ticket_id, role):
     keyboard = types.InlineKeyboardMarkup()
     open_ticket = types.InlineKeyboardButton("📨 Открыть обращение", callback_data=f'open_ticket_{ticket_id}_{role}')
     keyboard.add(open_ticket)
@@ -236,7 +236,7 @@ def opening_ticket_keyboard(role, ticket_info, page=1):
     if page > 1:
         page_management_buttons.append(
             types.InlineKeyboardButton(
-                '⬅️ Назад', callback_data=f'tickets_page_{page - 1}_{role}{'_'+type if role == 'admin' else ''}')
+                '⬅️ Назад', callback_data=f'tickets_page_{page - 1}_{role}{'_' + type if role == 'admin' else ''}')
         )
     else:
         page_management_buttons.append(types.InlineKeyboardButton("🔙  Выйти", callback_data=f'tickets_exit_{role}'))
@@ -245,23 +245,36 @@ def opening_ticket_keyboard(role, ticket_info, page=1):
     )
     if total_page > page:
         page_management_buttons.append(types.InlineKeyboardButton(
-            "▶️ Вперед", callback_data=f"tickets_page_{page + 1}_{role}{'_'+type if role == 'admin' else ''}")
+            "▶️ Вперед", callback_data=f"tickets_page_{page + 1}_{role}{'_' + type if role == 'admin' else ''}")
         )
     keyboard.row(*page_management_buttons)
     return keyboard
 
 
-def ticket_exit_keyboard(messages_id=None,role='user',type=None,id_ticket=None):
+def ticket_actions_keyboard(messages_id=None, role='user', type=None, id_ticket=None, photos_id=None):
     data = ''
     if messages_id:
         for i in messages_id:
             data += f"_{i.message_id}"
     keyboard = types.InlineKeyboardMarkup()
-    buttons = [
+    main_buttons = [
         types.InlineKeyboardButton('⬅️ Закрыть', callback_data=f'ticket_exit{data}_{role}{'_' + type if type else ''}')]
     if role == 'user':
-        buttons.append(types.InlineKeyboardButton('🗑️ Удалить обращение',callback_data=f'confirm_delete_ticket_{id_ticket}'))
-    keyboard.row(*buttons)
+        main_buttons.append(
+            types.InlineKeyboardButton('🗑️ Удалить обращение', callback_data=f'confirm_delete_ticket_{id_ticket}'))
+    keyboard.row(*main_buttons)
+    if photos_id:
+        photo_buttons = []
+        for num, photo_id in enumerate(photos_id):
+            photo_buttons.append(
+                types.InlineKeyboardButton(f'📷 Фото №{num + 1}', callback_data=f'opening_photo_{photo_id}'))
+        keyboard.row(*photo_buttons)
+    return keyboard
+
+def cancel_photo_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    cancel_btn = types.InlineKeyboardButton('⬅️ Закрыть', callback_data='cancel_photo')
+    keyboard.add(cancel_btn)
     return keyboard
 def admin_ticket_section_keyboard():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
@@ -273,29 +286,42 @@ def admin_ticket_section_keyboard():
     )
 
     return keyboard
-def accept_aggressive_title_keyboard(title,type_ticket):
+
+
+def accept_aggressive_title_keyboard(title, type_ticket):
     keyboard = types.InlineKeyboardMarkup()
-    btn_accept = types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'aggressive_title_accept_{title}_{type_ticket}')
+    btn_accept = types.InlineKeyboardButton("✅ Подтвердить",
+                                            callback_data=f'aggressive_title_accept_{title}_{type_ticket}')
     btn_cancel = types.InlineKeyboardButton("❌ Отменить", callback_data=f'aggressive_title_cancel')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
-def accept_aggressive_msg_keyboard(ticket_id,text):
+
+
+def accept_aggressive_msg_keyboard(ticket_id, text):
     keyboard = types.InlineKeyboardMarkup()
-    btn_accept = types.InlineKeyboardButton("✅ Подтвердить отправку", callback_data=f'aggressive_msg_to_ticket_accept_{ticket_id}_{text}')
-    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'aggressive_msg_to_ticket_cancel_{ticket_id}')
+    btn_accept = types.InlineKeyboardButton("✅ Подтвердить отправку",
+                                            callback_data=f'aggressive_msg_to_ticket_accept_{ticket_id}_{text}')
+    btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку",
+                                            callback_data=f'aggressive_msg_to_ticket_cancel_{ticket_id}')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
+
+
 def accept_custom_add_water_keyboard(amount_ml):
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'water_add_{amount_ml}')
     btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'water_add_custom_cancel')
     keyboard.add(btn_accept, btn_cancel)
     return keyboard
+
+
 def cancel_custom_add_water_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'water_add_custom_cancel')
     keyboard.add(btn_cancel)
     return keyboard
+
+
 def accept_delete_ticket_keyboard(ticket_id):
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'delete_ticket_{ticket_id}')

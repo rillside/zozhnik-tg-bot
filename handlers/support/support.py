@@ -3,13 +3,14 @@ from datetime import datetime, timedelta
 
 from utils.censorship.checker import censor_check, removal_of_admin_rights
 from database import add_ticket, load_info_by_ticket, get_ticket_status, replace_ticket_status, send_supp_msg, \
-    delete_ticket, tickets_by_user, load_tickets_info, count_tickets_for_admin
+    delete_ticket, tickets_by_user, load_tickets_info, count_tickets_for_admin, \
+    get_photo_ids_by_ticket, get_photo_file_id
 from handlers.admin_notifications import new_ticket_notify, new_message_in_ticket_notify
-from keyboards import supp_ticket_draft_keyboard, ticket_exit_keyboard, go_to_ticket_keyboard, \
+from keyboards import supp_ticket_draft_keyboard, ticket_actions_keyboard, go_to_ticket_keyboard, \
     accept_aggressive_msg_keyboard, accept_aggressive_title_keyboard, accept_delete_ticket_keyboard, \
-    opening_ticket_keyboard, support_selection_keyboard, admin_ticket_section_keyboard
+    opening_ticket_keyboard, support_selection_keyboard, admin_ticket_section_keyboard, cancel_photo_keyboard
 from messages import aggressive_content_warning_msg, succ_ticket_title_msg, open_ticket_msg, \
-    admin_open_ticket_msg, ticket_limit_error_msg, upload_photo_error, notify_new_message_in_ticket, \
+    admin_open_ticket_msg, ticket_limit_error_msg, notify_new_message_in_ticket, \
     error_ticket_opening_msg, ticket_closed_msg, confirm_delete_ticket_msg, cancellation, my_tickets_msg, \
     no_active_tickets_msg, admin_tickets_msg, support_selection_msg, admin_ticket_section_msg
 from utils.fsm import clear_state, set_state
@@ -19,6 +20,7 @@ async def opening_ticket(message, bot, id_ticket, role):
     max_char = 3800
     ticket_info, message_history = await load_info_by_ticket(id_ticket)
     id_ticket, title, user_id, username, first_name, status_for_user, status_for_admin, type_ticket, created_date, update_date = ticket_info
+    photos_id = await get_photo_ids_by_ticket(id_ticket)
     if not ticket_info:
         await bot.send_message(message.chat.id, error_ticket_opening_msg)
         return
@@ -35,8 +37,9 @@ async def opening_ticket(message, bot, id_ticket, role):
     if len(text_msg) <= max_char:
         last_msg = await bot.send_message(message.chat.id,
                                           text_msg,
-                                          reply_markup=ticket_exit_keyboard(role=role, type=type_ticket,
-                                                                            id_ticket=id_ticket)
+                                          reply_markup=ticket_actions_keyboard(role=role, type=type_ticket,
+                                                                            id_ticket=id_ticket,
+                                                                            photos_id=photos_id)
                                           )
     else:
         messages_id = []
@@ -45,8 +48,9 @@ async def opening_ticket(message, bot, id_ticket, role):
             if i == count_msg:
                 last_msg = await bot.send_message(message.chat.id,
                                                   text_msg[max_char * (i - 1):max_char * i + 1],
-                                                  reply_markup=ticket_exit_keyboard(messages_id, role, type=type_ticket,
-                                                                                    id_ticket=id_ticket)
+                                                  reply_markup=ticket_actions_keyboard(messages_id, role, type=type_ticket,
+                                                                                    id_ticket=id_ticket,
+                                                                                    photos_id=photos_id)
                                                   )
             else:
                 messages_id.append(await bot.send_message(
@@ -59,7 +63,9 @@ async def opening_ticket(message, bot, id_ticket, role):
         await replace_ticket_status(id_ticket, 'no_new', role)
     set_state(message.chat.id, 'waiting_send_msg_to_ticket', [id_ticket, role, last_msg, type_ticket, user_id])
 
-
+async def opening_photo_in_ticket(call, bot, msg_id):
+    file_id = await get_photo_file_id(msg_id)
+    await bot.send_photo(call.message.chat.id,file_id,reply_markup=cancel_photo_keyboard())
 async def handle_delete_ticket(call, bot, type_handle):
     await bot.delete_message(call.message.chat.id, call.message_id)
     if type_handle == 'delete':

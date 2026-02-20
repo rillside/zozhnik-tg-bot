@@ -11,7 +11,8 @@ from handlers.owner_menu import add_admin, remove_admin, return_admin
 from utils.antispam import mark_group_warned, is_group_warned
 from utils.scheduler import Scheduler
 from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
-    handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page, send_message_to_ticket
+    handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page, \
+    send_message_to_ticket, opening_photo_in_ticket
 from handlers.water import handle_add_water, add_custom_water
 from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_cancel, settings_keyboard, \
     water_setup_keyboard, water_goal_keyboard, get_water_interval_keyboard, water_add_keyboard, \
@@ -23,7 +24,7 @@ from messages import start_message, nf_cmd, adm_start_message, exit_home, exampl
     error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
     water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
     support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
-    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg
+    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, photo_is_closed_msg
 from handlers.settings import set_reminder_type_water, water_smart_type_install, \
     water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg
 from handlers.sleeps import sleeps_main
@@ -377,7 +378,9 @@ async def callback_inline(call):
                 )
             else:
                 await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
-
+        case data if data.startswith('opening_photo_'):
+            msg_id = data.split('_')[2]
+            await opening_photo_in_ticket(call,bot, msg_id)
         case data if data.startswith('ticket_exit'):
             await ticket_exit(call, bot)
         case 'adm_tickets_tech' | 'adm_tickets_consult':
@@ -404,6 +407,10 @@ async def callback_inline(call):
                 call.message.from_user.first_name),
                                    reply_markup=support_selection_keyboard()
                                    )
+        case 'cancel_photo':
+            await bot.answer_callback_query(call.id, photo_is_closed_msg, show_alert=False)
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+
 
 
 async def start_bot():
