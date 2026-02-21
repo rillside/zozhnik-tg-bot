@@ -18,7 +18,7 @@ from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_ca
     water_setup_keyboard, water_goal_keyboard, get_water_interval_keyboard, water_add_keyboard, \
     timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
     technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
-    admin_ticket_section_keyboard
+    admin_ticket_section_keyboard, water_goal_not_set_keyboard
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
     add_new_adm_msg, remove_adm_msg, \
     error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
@@ -156,7 +156,8 @@ async def msg(message):
                                        )
             else:
                 await bot.send_message(message.chat.id,
-                                       water_goal_not_set_msg)
+                                       water_goal_not_set_msg,
+                                       reply_markup=water_goal_not_set_keyboard())
         case "💪 Физ-активность":
             await bot.send_message(message.chat.id, sports_main())
 

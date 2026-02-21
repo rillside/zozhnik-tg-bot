@@ -100,7 +100,11 @@ def settings_keyboard():
     keyboard.add(cancel_settings)
     return keyboard
 
-
+def water_goal_not_set_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    go_to_water_stg = types.InlineKeyboardButton('⚙️ Настроить',callback_data='water_settings')
+    keyboard.add(go_to_water_stg)
+    return keyboard
 def water_setup_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     water_target = types.InlineKeyboardButton("🎯 Цель на день", callback_data='water_goal')
