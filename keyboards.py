@@ -100,11 +100,14 @@ def settings_keyboard():
     keyboard.add(cancel_settings)
     return keyboard
 
+
 def water_goal_not_set_keyboard():
     keyboard = types.InlineKeyboardMarkup()
-    go_to_water_stg = types.InlineKeyboardButton('⚙️ Настроить',callback_data='water_settings')
+    go_to_water_stg = types.InlineKeyboardButton('⚙️ Настроить', callback_data='water_settings')
     keyboard.add(go_to_water_stg)
     return keyboard
+
+
 def water_setup_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     water_target = types.InlineKeyboardButton("🎯 Цель на день", callback_data='water_goal')
@@ -275,11 +278,14 @@ def ticket_actions_keyboard(messages_id=None, role='user', type=None, id_ticket=
         keyboard.row(*photo_buttons)
     return keyboard
 
-def cancel_photo_keyboard():
+
+def cancel_media_keyboard():
     keyboard = types.InlineKeyboardMarkup()
-    cancel_btn = types.InlineKeyboardButton('⬅️ Закрыть', callback_data='cancel_photo')
+    cancel_btn = types.InlineKeyboardButton('⬅️ Закрыть', callback_data='cancel_media')
     keyboard.add(cancel_btn)
     return keyboard
+
+
 def admin_ticket_section_keyboard():
     keyboard = types.InlineKeyboardMarkup(row_width=2)
 
@@ -331,4 +337,237 @@ def accept_delete_ticket_keyboard(ticket_id):
     btn_accept = types.InlineKeyboardButton("✅ Подтвердить", callback_data=f'delete_ticket_{ticket_id}')
     btn_cancel = types.InlineKeyboardButton("❌ Отмена", callback_data=f'cancel_delete_ticket_{ticket_id}')
     keyboard.add(btn_accept, btn_cancel)
+    return keyboard
+
+
+def admin_exercise_keyboard():
+    """Клавиатура управления упражнениями для админа"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    buttons = [
+        types.InlineKeyboardButton("📝 Добавить", callback_data="admin_exercise_add"),
+        types.InlineKeyboardButton("✏️ Редактировать", callback_data="admin_exercise_edit"),
+        types.InlineKeyboardButton("📊 Статистика", callback_data="admin_exercise_stats"),
+        types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back_main")
+    ]
+
+    keyboard.add(*buttons)
+    return keyboard
+
+
+def exercise_navigation_keyboard(step):
+    """Клавиатура с навигацией для добавления упражнения"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    buttons = []
+    if step > 1:
+        buttons.append(types.InlineKeyboardButton("🔙 Назад", callback_data="add_exercise_back"))
+    buttons.append(types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel"))
+    keyboard.row(*buttons)
+    return keyboard
+
+
+
+def ex_category_keyboard(mode='add',ex_id=None):
+    """Клавиатура выбора категории упражнения"""
+
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    keyboard.add(
+        types.InlineKeyboardButton("💪 Силовые", callback_data=f"{mode}_exercise_category_strength"),
+        types.InlineKeyboardButton("🏃 Кардио", callback_data=f"{mode}_exercise_category_cardio")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧘 Растяжка", callback_data=f"{mode}_exercise_category_stretching"),
+        types.InlineKeyboardButton("🚶 Ходьба", callback_data=f"{mode}_exercise_category_walking")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧍 Зарядка", callback_data=f"{mode}_exercise_category_warmup"),
+        types.InlineKeyboardButton("⚖️ Баланс", callback_data=f"{mode}_exercise_category_balance")
+    )
+    if mode == 'add':
+        keyboard.add(
+            types.InlineKeyboardButton("🔙 Назад", callback_data="add_exercise_back"),
+            types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel")
+        )
+    else:
+        keyboard.add(
+            types.InlineKeyboardButton("❌ Отмена",callback_data=f"edit_exercise_select_{ex_id}"),
+        )
+
+    return keyboard
+
+
+def ex_difficulty_keyboard(mode='add',ex_id=None):
+    """Клавиатура выбора уровня сложности"""
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    keyboard.add(types.InlineKeyboardButton("🌱 Новичок", callback_data=f"{mode}_exercise_difficulty_beginner"))
+    keyboard.add(types.InlineKeyboardButton("🌿 Средний", callback_data=f"{mode}_exercise_difficulty_intermediate"))
+    keyboard.add(types.InlineKeyboardButton("🌳 Продвинутый", callback_data=f"{mode}_exercise_difficulty_advanced"))
+    if mode == 'add':
+        keyboard.add(
+            types.InlineKeyboardButton("🔙 Назад", callback_data="add_exercise_back"),
+            types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel")
+        )
+    else:
+        keyboard.add(
+            types.InlineKeyboardButton("❌ Отмена", callback_data=f"edit_exercise_select_{ex_id}"),
+        )
+
+    return keyboard
+
+def exercise_confirm_keyboard():
+    """Клавиатура подтверждения/отмены"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(types.InlineKeyboardButton('📷 Открыть видео',callback_data="exercise_confirm_open_video"))
+    keyboard.add(
+        types.InlineKeyboardButton("✅ Подтвердить", callback_data="exercise_confirm_save"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel")
+    )
+    return keyboard
+def exercise_category_filter_keyboard():
+    """Клавиатура выбора категории для редактирования упражнений"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    keyboard.add(
+        types.InlineKeyboardButton("💪 Силовые", callback_data="filter_edit_exercise_category_strength"),
+        types.InlineKeyboardButton("🏃 Кардио", callback_data="filter_edit_exercise_category_cardio")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧘 Растяжка", callback_data="filter_edit_exercise_category_stretching"),
+        types.InlineKeyboardButton("🚶 Ходьба", callback_data="filter_edit_exercise_category_walking")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧍 Зарядка", callback_data="filter_edit_exercise_category_warmup"),
+        types.InlineKeyboardButton("⚖️ Баланс", callback_data="filter_edit_exercise_category_balance")
+    )
+
+    keyboard.add(
+        types.InlineKeyboardButton("❌ Отмена", callback_data="edit_exercise_cancel")
+    )
+
+    return keyboard
+def exercise_difficulty_filter_keyboard(category):
+    """Клавиатура выбора уровня сложности для редактирования упражнений"""
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    keyboard.add(
+        types.InlineKeyboardButton("🌱 Новичок", callback_data=f"filter_edit_exercise_difficulty_{category}_beginner"),
+        types.InlineKeyboardButton("🌿 Средний", callback_data=f"filter_edit_exercise_difficulty_{category}_intermediate"),
+        types.InlineKeyboardButton("🌳 Продвинутый", callback_data=f"filter_edit_exercise_difficulty_{category}_advanced")
+    )
+
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 Назад к категориям", callback_data="edit_exercise_back_to_categories"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data="edit_exercise_cancel")
+    )
+
+    return keyboard
+def exercises_pagination_keyboard(exercise_list,category,difficulty,page=1):
+    """Клавиатура со списком упражнений и пагинацией"""
+    exercise_list.reverse()
+    total_pages = -(-len(exercise_list)//10) # к большему
+    first = page * 10 - 10
+    last = page * 10 + 1
+    keyboard = types.InlineKeyboardMarkup()
+    for ex_id,name in exercise_list[first:last]:
+        keyboard.row(
+            types.InlineKeyboardButton(f"📋 {name}",callback_data=f"edit_exercise_select_{ex_id}")
+        )
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data=f"edit_exercises_page_{page - 1}_{category}_{difficulty}"
+        ))
+    else:
+        nav_buttons.append(types.InlineKeyboardButton("🔙  Выйти", callback_data='edit_exercise_cancel'))
+
+    nav_buttons.append(types.InlineKeyboardButton(
+        f"{page}/{total_pages}",
+        callback_data="edit_exercises_page_info"
+    ))
+
+    if page < total_pages:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "➡️ Вперед",
+            callback_data=f"edit_exercises_page_{page + 1}_{category}_{difficulty}"
+        ))
+
+    keyboard.row(*nav_buttons)
+    return keyboard
+
+def no_exercises_keyboard():
+    """Клавиатура при отсутствии упражнений для редактирования"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    keyboard.add(
+        types.InlineKeyboardButton("🔄 Выбрать другую категорию", callback_data="edit_exercise_back_to_categories"),
+        types.InlineKeyboardButton("➕ Создать упражнение", callback_data="admin_exercise_add"),
+        types.InlineKeyboardButton("❌ Выйти", callback_data="edit_exercise_cancel")
+    )
+
+    return keyboard
+
+
+# keyboards.py
+
+def exercise_edit_keyboard(exercise_id, category, difficulty):
+    """
+    Клавиатура для редактирования упражнения
+    """
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    # Кнопки для редактирования каждого параметра
+    keyboard.add(
+        types.InlineKeyboardButton("📝 Название", callback_data=f"ex_edit_field_{exercise_id}_name"),
+        types.InlineKeyboardButton("📋 Описание", callback_data=f"ex_edit_field_{exercise_id}_desc")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🏷️ Категория", callback_data=f"ex_edit_field_{exercise_id}_cat"),
+        types.InlineKeyboardButton("📊 Сложность", callback_data=f"ex_edit_field_{exercise_id}_diff")
+    )
+
+    # Кнопки для видео
+    keyboard.row(
+        types.InlineKeyboardButton("📹 Открыть видео", callback_data=f"ex_edit_open_video_{exercise_id}"),
+        types.InlineKeyboardButton("📹 Заменить видео", callback_data=f"ex_edit_field_{exercise_id}_videochange")
+    )
+
+    # Кнопки статуса и удаления
+    keyboard.add(
+        types.InlineKeyboardButton("🔄 Изменить статус", callback_data=f"ex_edit_field_{exercise_id}_status"),
+        types.InlineKeyboardButton("🗑️ Удалить", callback_data=f"ex_edit_delete_{exercise_id}_{category}_{difficulty}")
+    )
+
+    # Навигация
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 К списку", callback_data=f"edit_exercise_back_to_list_{category}_{difficulty}"),
+        types.InlineKeyboardButton("❌ Выйти", callback_data="edit_exercise_cancel")
+    )
+
+    return keyboard
+def exercise_edit_cancel_keyboard(ex_id):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton('❌ Отмена',callback_data=f"edit_exercise_select_{ex_id}")
+    )
+    return keyboard
+
+
+def ex_confirm_delete_keyboard(ex_id,category,difficulty):
+    """Клавиатура подтверждения удаления упражнения"""
+    keyboard = types.InlineKeyboardMarkup()
+
+    keyboard.add(
+        types.InlineKeyboardButton("✅ Удалить", callback_data=f"confirm_delete_ex_{ex_id}_{category}_{difficulty}"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data=f"cancel_delete_ex_{ex_id}_{category}_{difficulty}")
+    )
+
+    return keyboard
+def cancel_any_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton('⬅️ Закрыть', callback_data='cancel_any')
+    )
     return keyboard

@@ -2,7 +2,7 @@ import logging
 import time
 import asyncio
 from config import owners
-from database import get_id_by_username, get_all_admin
+from database import get_id_by_username, get_all_admin, get_username_by_id
 from keyboards import return_admin_rights, go_to_ticket_keyboard
 from messages import adm_update_username_msg, censorship_violation_msg, remove_adm_censor_msg, broadcast_return_adm, \
     broadcast_add_adm_msg, broadcast_remove_adm_msg, admin_notify_new_ticket, admin_notify_new_message_in_ticket
@@ -32,10 +32,12 @@ async def admin_censorship_violation(bot, text_br, sender_id, sender_username,co
 
 
 async def return_admin_notify(bot, user_id, owner_id):
+    owner_username = await get_username_by_id(owner_id)
+    user_username = await get_username_by_id(user_id)
     for i in owners:
         if i == owner_id:
             continue
-        await bot.send_message(i, broadcast_return_adm(user_id, owner_id))
+        await bot.send_message(i, broadcast_return_adm(owner_id,owner_username,user_username))
 
 
 async def add_admin_notify(bot, owner_id, user_id):

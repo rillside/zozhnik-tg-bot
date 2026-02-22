@@ -36,6 +36,7 @@ async def init_db():
                 last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
         await conn.execute('''
                 CREATE TABLE IF NOT EXISTS track_water (
                     user_id INTEGER PRIMARY KEY,
@@ -56,6 +57,7 @@ async def init_db():
                     last_reset TEXT
                 )
             ''')
+
         await conn.execute('''
         CREATE TABLE IF NOT EXISTS water_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,6 +67,30 @@ async def init_db():
             week_start TEXT
             )
             ''')
+
+        await conn.execute('''
+        CREATE TABLE IF NOT EXISTS exercises (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            category TEXT,
+            difficulty TEXT,
+            file_id TEXT,
+            created_by INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT 1
+            )
+            ''')
+        await conn.execute('''
+                        CREATE TABLE IF NOT EXISTS exercises_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER,
+                            exercise_id INTEGER,
+                            date DATE DEFAULT CURRENT_DATE,
+                            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                            ''')
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS tickets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -246,7 +272,7 @@ async def water_set_reminder_type(user_id, broadcast_type, broadcast_interval=No
             await cursor.execute(
                 'UPDATE track_water SET broadcast_type = ?, broadcast_interval = NULL WHERE user_id = ?',
                 (broadcast_type, user_id)
-                )
+            )
 
         else:
             await cursor.execute('UPDATE track_water SET broadcast_type = ?, broadcast_interval = ? WHERE user_id = ?',
@@ -288,7 +314,7 @@ async def count_users_trackers(db_table, column_name, user_id=None):
     return result[0]
 
 
-async def add_water_ml(user_id, volume_ml,add_total=True):
+async def add_water_ml(user_id, volume_ml, add_total=True):
     today = await get_user_time_now(user_id)
     day_name = today.strftime('%A')
     now_user_date = today.date()
@@ -367,13 +393,18 @@ async def water_reset(user_id):
     async with get_connection() as conn:
         await conn.execute('''UPDATE track_water SET Monday = 0,Tuesday = 0,
         Wednesday = 0,Thursday = 0,Friday = 0,Saturday = 0,Sunday = 0 WHERE USER_ID = ?''', (user_id,))
+
+
 async def get_lost_records_of_water(user_id):
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT id,amount,week_start FROM water_logs WHERE user_id = ?''', (user_id,))
         return await cursor.fetchall()
+
+
 async def delete_water_log(log_id):
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM water_logs WHERE id = ?''', (log_id,))
+
 
 async def add_ticket(title, user_id, username, first_name, type_supp):
     async with get_connection() as conn:
@@ -390,7 +421,7 @@ async def delete_ticket(ticket_id):
                            (ticket_id,))
 
 
-async def send_supp_msg(ticket_id, text, is_from_user,type_msg='string',file_id=None):
+async def send_supp_msg(ticket_id, text, is_from_user, type_msg='string', file_id=None):
     async with get_connection() as conn:
         if type_msg == 'string':
             await conn.execute('''INSERT INTO messages
@@ -401,7 +432,7 @@ async def send_supp_msg(ticket_id, text, is_from_user,type_msg='string',file_id=
             await conn.execute('''INSERT INTO messages 
                                 (ticket_id, text, is_from_user,type_msg,file_id)
                                 VALUES ( ?, ?, ?,?,?)''',
-                               (ticket_id,text,is_from_user,type_msg,file_id))
+                               (ticket_id, text, is_from_user, type_msg, file_id))
         await conn.execute('''UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?''',
                            (ticket_id,))
 
@@ -426,19 +457,26 @@ async def load_info_by_ticket(ticket_id):
         cursor = await conn.cursor()
         await cursor.execute('''SELECT * FROM tickets WHERE id = ?''', (ticket_id,))
         ticket_info = await cursor.fetchone()
-        await cursor.execute('''SELECT is_from_user,text,type_msg,file_id FROM messages WHERE ticket_id = ?''', (ticket_id,))
+        await cursor.execute('''SELECT is_from_user,text,type_msg,file_id FROM messages WHERE ticket_id = ?''',
+                             (ticket_id,))
         message_info = await cursor.fetchall()
     return ticket_info, message_info
+
+
 async def get_photo_ids_by_ticket(ticket_id):
     async with get_connection() as conn:
         cursor = await conn.execute("SELECT id FROM messages WHERE ticket_id = ? AND type_msg = 'photo'", (ticket_id,))
         rows = await cursor.fetchall()
         return [row[0] for row in rows]
+
+
 async def get_photo_file_id(msg_id):
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT file_id FROM messages WHERE id = ?', (msg_id,))
         result = await cursor.fetchone()
         return result[0] if result else None
+
+
 async def load_tickets_info(user_id=None, role='user', type=None):
     async with get_connection() as conn:
         cursor = await conn.cursor()
@@ -472,3 +510,108 @@ async def get_users_for_water_reminders():
         last_broadcast,last_update FROM track_water WHERE broadcast_type IS NOT NULL''')
         result = await cursor.fetchall()
     return result
+
+
+async def is_exercise_name_exists(name):
+    """Проверяет, есть ли уже упражнение с таким названием"""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT 1 FROM exercises WHERE name = ? AND is_active = 1', (name,))
+        result = await cursor.fetchone()
+        return result is not None
+
+
+async def add_exercise_to_db(name, description, category, difficulty, file_id, created_by):
+    async with get_connection() as conn:
+        await conn.execute('''INSERT INTO exercises (name, description,
+         category, difficulty, file_id, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?) ''',
+                           (name, description, category, difficulty, file_id, created_by)
+                           )
+
+
+async def get_exercises_id_name(category, difficulty):
+    """Возвращает список кортежей (id, name)
+    всех упражнений(даже неактивных) по заданным фильтрам"""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT id,name FROM exercises WHERE category = ? AND difficulty = ?''',
+                                    (category, difficulty))
+        res = await cursor.fetchall()
+    return res
+
+
+async def get_exercise_by_id(exercise_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT * FROM exercises WHERE id = ?''', (exercise_id,))
+        res = await cursor.fetchone()
+    return res
+
+
+async def get_file_id_by_ex_id(ex_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT file_id FROM exercises WHERE id = ?''', (ex_id,))
+        res = await cursor.fetchone()
+    return res[0]
+
+
+async def get_exercise_status(ex_id):
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT is_active FROM exercises WHERE id = ?''',
+                                    (ex_id,))
+        res = await cursor.fetchone()
+        return int(res[0])
+
+
+async def update_exercise_in_db(ex_id, db_field, new_value):
+    async with get_connection() as conn:
+        await conn.execute(f'''UPDATE exercises SET {db_field} = ? WHERE id = ?''',
+                           (new_value, ex_id))
+async def delete_exercise_in_db (ex_id):
+    async with get_connection() as conn:
+        await conn.execute(f'''DELETE FROM exercises WHERE id = ?''',
+                           (ex_id,))
+        await conn.execute(f'''DELETE FROM exercises_logs WHERE exercise_id = ?''',
+                           (ex_id,))
+
+
+async def get_exercise_stats():
+    """
+    Собирает статистику по упражнениям:
+    - общее количество
+    - количество выполнений
+    - популярные упражнения
+    - статистика за неделю
+    """
+    async with get_connection() as conn:
+        # Общее количество упражнений
+        cursor = await conn.execute('SELECT COUNT(*) FROM exercises WHERE is_active = 1')
+        total = (await cursor.fetchone())[0]
+
+        # Общее количество выполнений
+        cursor = await conn.execute('SELECT COUNT(*) FROM user_exercises')
+        total_completions = (await cursor.fetchone())[0]
+
+        # Самые популярные упражнения
+        cursor = await conn.execute('''
+            SELECT e.name, COUNT(ue.id) as count 
+            FROM exercises e
+            LEFT JOIN user_exercises ue ON e.id = ue.exercise_id
+            WHERE e.is_active = 1
+            GROUP BY e.id
+            ORDER BY count DESC
+            LIMIT 5
+        ''')
+        popular = await cursor.fetchall()
+
+        # Статистика за последние 7 дней
+        cursor = await conn.execute('''
+            SELECT COUNT(*) FROM user_exercises 
+            WHERE date >= DATE('now', '-7 days')
+        ''')
+        weekly = (await cursor.fetchone())[0]
+
+        return {
+            'total': total,
+            'total_completions': total_completions,
+            'popular': popular,
+            'weekly': weekly
+        }

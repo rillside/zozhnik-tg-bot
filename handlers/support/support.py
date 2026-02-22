@@ -8,7 +8,7 @@ from database import add_ticket, load_info_by_ticket, get_ticket_status, replace
 from handlers.admin_notifications import new_ticket_notify, new_message_in_ticket_notify
 from keyboards import supp_ticket_draft_keyboard, ticket_actions_keyboard, go_to_ticket_keyboard, \
     accept_aggressive_msg_keyboard, accept_aggressive_title_keyboard, accept_delete_ticket_keyboard, \
-    opening_ticket_keyboard, support_selection_keyboard, admin_ticket_section_keyboard, cancel_photo_keyboard
+    opening_ticket_keyboard, support_selection_keyboard, admin_ticket_section_keyboard, cancel_media_keyboard
 from messages import aggressive_content_warning_msg, succ_ticket_title_msg, open_ticket_msg, \
     admin_open_ticket_msg, ticket_limit_error_msg, notify_new_message_in_ticket, \
     error_ticket_opening_msg, ticket_closed_msg, confirm_delete_ticket_msg, cancellation, my_tickets_msg, \
@@ -65,7 +65,7 @@ async def opening_ticket(message, bot, id_ticket, role):
 
 async def opening_photo_in_ticket(call, bot, msg_id):
     file_id = await get_photo_file_id(msg_id)
-    await bot.send_photo(call.message.chat.id,file_id,reply_markup=cancel_photo_keyboard())
+    await bot.send_photo(call.message.chat.id,file_id,reply_markup=cancel_media_keyboard())
 async def handle_delete_ticket(call, bot, type_handle):
     await bot.delete_message(call.message.chat.id, call.message_id)
     if type_handle == 'delete':
@@ -178,6 +178,7 @@ async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_t
                                               message.from_user.username,
                                               'supp'
                                               )
+                clear_state(message.chat.id)
                 return
     else:
         await bot.send_message(message.chat.id, ticket_limit_error_msg(1000, 'сообщение'))

@@ -8,6 +8,11 @@ from database import init_db, add_user, update_user_activity_smart, update_usern
     count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info, get_all_admin
 from handlers.broadcast import broadcast_send, accept_broadcast
 from handlers.owner_menu import add_admin, remove_admin, return_admin
+from handlers.sports.admin_exercises import exercise_management, start_add_exercise, handle_exercise_name, \
+    handle_exercise_description, handle_exercise_category, handle_exercise_difficulty, handle_exercise_video, \
+    save_exercise, open_video, exercise_go_back, edit_exercise_start, edit_exercise_handle_category, \
+    edit_exercise_show_list, open_exercise_for_edit, save_exercise_changes, handle_exercise_edit, \
+    accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise
 from utils.antispam import mark_group_warned, is_group_warned
 from utils.scheduler import Scheduler
 from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
@@ -18,22 +23,23 @@ from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_ca
     water_setup_keyboard, water_goal_keyboard, get_water_interval_keyboard, water_add_keyboard, \
     timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
     technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
-    admin_ticket_section_keyboard, water_goal_not_set_keyboard
+    admin_ticket_section_keyboard, water_goal_not_set_keyboard, admin_exercise_keyboard, \
+    exercise_category_filter_keyboard
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
     add_new_adm_msg, remove_adm_msg, \
     error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
     water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
     support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
-    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, photo_is_closed_msg
+    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, exercise_saved_msg, \
+    exercise_cancel_msg, media_is_closed_msg, edit_exercise_category_msg
 from handlers.settings import set_reminder_type_water, water_smart_type_install, \
     water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg
 from handlers.sleeps import sleeps_main
-from handlers.sports import sports_main
 from handlers.stats import adm_stats, owner_stats
 from config import token, is_admin, is_owner
 from utils.fsm import user_states, get_state, set_state, clear_state
 
-bot = AsyncTeleBot(token)
+bot = AsyncTeleBot(token,parse_mode = "Markdown")
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -111,6 +117,16 @@ async def state_handler(message):
             await add_custom_water(message, bot)
         case 'waiting_custom_water_goal':
             await water_goal_custom_stg(bot, message, *data)
+        case 'adding_exercise':
+            if data == {}:
+                await handle_exercise_name(message,bot)
+            elif 'name' in data and 'description' not in data:
+                await handle_exercise_description(message,bot)
+        case 'waiting_new_exercise_field':
+            if 'action' in data and 'ex_id' in data:
+                await save_exercise_changes(bot,message=message)
+
+
 _locks = {}
 @bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
 async def handle_photo_with_state(message):
@@ -136,7 +152,16 @@ async def handle_photo_with_state(message):
         case 'waiting_send_msg_to_ticket':
             await send_message_to_ticket(message,bot,*data,type_msg='photo',file_id=file_id,caption=caption)
 
-
+@bot.message_handler(content_types=['video', 'animation'], func=lambda msg: user_states.get(msg.chat.id))
+async def handle_video_with_state(message):
+    state, data = get_state(message.chat.id)
+    match state:
+        case 'adding_exercise':
+            if 'difficulty' in data:
+                await handle_exercise_video(message,bot)
+        case 'waiting_new_exercise_field':
+            if 'action' in data and 'ex_id' in data:
+                await save_exercise_changes(bot,message=message)
 
 
 @bot.message_handler(content_types=['text'])
@@ -159,7 +184,8 @@ async def msg(message):
                                        water_goal_not_set_msg,
                                        reply_markup=water_goal_not_set_keyboard())
         case "💪 Физ-активность":
-            await bot.send_message(message.chat.id, sports_main())
+            pass
+            # await bot.send_message(message.chat.id, sports_main())
 
         case "😴 Сон":
             await bot.send_message(message.chat.id, sleeps_main())
@@ -193,7 +219,8 @@ async def msg(message):
             await bot.send_message(message.chat.id,
                                    example_broadcast, reply_markup=cancel_br_start())
             set_state(message.chat.id, 'waiting_broadcast_text', None)
-
+        case '💪 Управление упражнениями' if await is_admin(message.chat.id):
+            await exercise_management(message,bot)
         case '👨‍⚕️ Обращения' if await is_admin(message.chat.id):
             await bot.send_message(message.chat.id,
                                    admin_ticket_section_msg(
@@ -408,9 +435,71 @@ async def callback_inline(call):
                 call.message.from_user.first_name),
                                    reply_markup=support_selection_keyboard()
                                    )
-        case 'cancel_photo':
-            await bot.answer_callback_query(call.id, photo_is_closed_msg, show_alert=False)
+        case 'cancel_media':
+            await bot.answer_callback_query(call.id, media_is_closed_msg, show_alert=False)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+        case 'admin_exercise_add':
+            await start_add_exercise(call, bot)
+        case data if data.startswith('add_exercise_category_'):
+            await handle_exercise_category(call, bot)
+        case data if data.startswith('add_exercise_difficulty_'):
+            await handle_exercise_difficulty(call,bot)
+        case 'exercise_confirm_open_video':
+            await open_video(call, bot)
+        case 'exercise_confirm_save':
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await save_exercise(call.message.chat.id,call.message.from_user.username,bot)
+            clear_state(call.message.chat.id)
+        case 'add_exercise_back':
+            await exercise_go_back(call, bot)
+        case 'add_exercise_cancel':
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await bot.send_message(call.message.chat.id,exercise_cancel_msg,
+                                   reply_markup=admin_exercise_keyboard())
+            clear_state(call.message.chat.id)
+        case 'admin_exercise_edit' | 'edit_exercise_back_to_categories' :
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await edit_exercise_start(call, bot)
+        case data if data.startswith('filter_edit_exercise_category_'):
+            await edit_exercise_handle_category(call,bot)
+        case data if (data.startswith('filter_edit_exercise_difficulty_') #Первое открытие списка
+                      or data.startswith('edit_exercises_page_') #Переход между страницами
+                      or data.startswith('edit_exercise_back_to_list_')): #После закрытия др. Упражнения
+            await edit_exercise_show_list(call,bot)
+        case data if data.startswith('edit_exercise_select_'):
+            await open_exercise_for_edit(call=call,bot=bot)
+        case 'edit_exercise_cancel':
+            clear_state(call.message.chat.id)
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await exercise_management(call.message, bot,call.from_user.first_name)
+        case data if data.startswith('ex_edit_open_video_'):
+            await open_video(call,bot,is_moment_of_creation=False)
+        case data if data.startswith('ex_edit_field_'):
+            await handle_exercise_edit(call,bot)
+        case data if data.startswith('edit_exercise_category') or data.startswith('edit_exercise_difficulty'):
+            await save_exercise_changes(bot,call=call)
+        case data if data.startswith('ex_edit_delete_'):
+            await accept_delete_exercise(call,bot)
+        case data if data.startswith('confirm_delete_ex_'):
+            await delete_exercise(call,bot)
+        case data if data.startswith('cancel_delete_ex_'):
+            await cancel_delete_exercise(call,bot)
+        case 'admin_exercise_stats':
+            await stats_exercise(call,bot)
+        case 'cancel_any':
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
