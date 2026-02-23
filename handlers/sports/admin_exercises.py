@@ -4,7 +4,7 @@ from database import add_exercise_to_db, is_exercise_name_exists, get_exercises_
 from keyboards import admin_exercise_keyboard, exercise_navigation_keyboard, ex_difficulty_keyboard, \
     ex_category_keyboard, \
     exercise_confirm_keyboard, cancel_media_keyboard, exercise_category_filter_keyboard, \
-    exercise_difficulty_filter_keyboard, exercises_pagination_keyboard, no_exercises_keyboard, exercise_edit_keyboard, \
+    exercise_difficulty_filter_keyboard, edit_ex_pagination_keyboard, no_exercises_keyboard, exercise_edit_keyboard, \
     exercise_edit_cancel_keyboard, ex_confirm_delete_keyboard, cancel_any_keyboard
 from messages import admin_exercise_menu_msg, exercise_request_name_msg, exercise_name_too_long_msg, \
     exercise_request_description_msg, exercise_description_too_short_msg, exercise_description_too_long_msg, \
@@ -292,7 +292,7 @@ async def edit_exercise_handle_category(call, bot):
 
 async def edit_exercise_show_list(call, bot):
     """
-    Показывает список упражнений с пагинацией.
+    Показывает список упражнений для редактирования с пагинацией.
     Может вызываться:
     - после выбора сложности(category, difficulty заданы)
     - при переходе по страницам (page меняется)
@@ -313,7 +313,7 @@ async def edit_exercise_show_list(call, bot):
     exercise_list = await get_exercises_id_name(category, difficulty)
     if exercise_list:
         text = exercises_list_header_msg
-        keyboard = exercises_pagination_keyboard(exercise_list, category, difficulty, int(page))
+        keyboard = edit_ex_pagination_keyboard(exercise_list, category, difficulty, int(page))
     else:
         text = no_exercises_found_msg
         keyboard = no_exercises_keyboard()

@@ -178,7 +178,7 @@ def support_selection_keyboard():
     technical_support = types.InlineKeyboardButton("🔧 Техподдержка", callback_data='technical_support')
     personal_consultation = types.InlineKeyboardButton("👨‍⚕️ Консультация", callback_data='personal_consultation')
     my_tickets = types.InlineKeyboardButton("📋 Мои обращения", callback_data='my_tickets')
-    supp_exit = types.InlineKeyboardButton("🔙  Выйти", callback_data='supp_exit')
+    supp_exit = types.InlineKeyboardButton("🔙  Выйти", callback_data='back_to_main')
     keyboard.add(technical_support, personal_consultation,
                  my_tickets, supp_exit)
     return keyboard
@@ -463,8 +463,11 @@ def exercise_difficulty_filter_keyboard(category):
     )
 
     return keyboard
-def exercises_pagination_keyboard(exercise_list,category,difficulty,page=1):
-    """Клавиатура со списком упражнений и пагинацией"""
+def edit_ex_pagination_keyboard(exercise_list,category,difficulty,page=1):
+    """
+    Клавиатура со списком упражнений и пагинацией
+    Используется для просмотра упражнений, готовых к редактированию
+    """
     exercise_list.reverse()
     total_pages = -(-len(exercise_list)//10) # к большему
     first = page * 10 - 10
@@ -570,4 +573,133 @@ def cancel_any_keyboard():
     keyboard.add(
         types.InlineKeyboardButton('⬅️ Закрыть', callback_data='cancel_any')
     )
+    return keyboard
+
+
+
+def sports_main_menu_keyboard():
+    """Главное меню раздела Физ-активность"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    keyboard.add(
+        types.InlineKeyboardButton("🏋️ Все упражнения", callback_data="sports_check_all"),
+        types.InlineKeyboardButton("❤️ Избранное", callback_data="sports_check_favorites")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("📊 Мой прогресс", callback_data="sports_check_my_stats")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 На главную", callback_data="back_to_main")
+    )
+
+    return keyboard
+
+
+def sports_category_keyboard():
+    """
+    Пользовательская клавиатура выбора
+    категории для просмотра всех упражнений
+    """
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    keyboard.add(
+        types.InlineKeyboardButton("💪 Силовые", callback_data="sports_category_strength"),
+        types.InlineKeyboardButton("🏃 Кардио", callback_data="sports_category_cardio")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧘 Растяжка", callback_data="sports_category_stretching"),
+        types.InlineKeyboardButton("🚶 Ходьба", callback_data="sports_category_walking")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("🧍 Зарядка", callback_data="sports_category_warmup"),
+        types.InlineKeyboardButton("⚖️ Баланс", callback_data="sports_category_balance")
+    )
+
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 Назад", callback_data="sports_back_to_main"),
+        types.InlineKeyboardButton("❌ Закрыть", callback_data="sports_close")
+    )
+    return keyboard
+def sports_difficulty_keyboard(category):
+    """
+    Пользовательская клавиатура выбора
+    уровня сложности для просмотра всех упражнений
+    """
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+
+    keyboard.add(
+        types.InlineKeyboardButton("🌱 Новичок", callback_data=f"sports_difficulty_{category}_beginner"),
+        types.InlineKeyboardButton("🌿 Средний", callback_data=f"sports_difficulty_{category}_intermediate"),
+        types.InlineKeyboardButton("🌳 Продвинутый", callback_data=f"sports_difficulty_{category}_advanced")
+    )
+
+    keyboard.add(
+        types.InlineKeyboardButton("🔙 Назад к категориям", callback_data="sports_back_to_categories"),
+        types.InlineKeyboardButton("❌ Закрыть", callback_data="sports_close")
+    )
+
+    return keyboard
+def sports_all_pagination_keyboard(exercise_list,category,difficulty,page=1):
+    """
+    Клавиатура со списком упражнений и пагинацией
+    Используется для просмотра всех активных упражнений
+    """
+    exercise_list.reverse() #Сначала новые
+    total_pages = -(-len(exercise_list)//10) # к большему
+    first = page * 10 - 10
+    last = page * 10 + 1
+    keyboard = types.InlineKeyboardMarkup()
+    for ex_id,name in exercise_list[first:last]:
+        keyboard.row(
+            types.InlineKeyboardButton(f"📋 {name}",callback_data=f"sports_open_ex_{ex_id}")
+        )
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "⬅️ Назад",
+            callback_data=f"sport_ex_all_page_{page - 1}_{category}_{difficulty}"
+        ))
+    else:
+        nav_buttons.append(types.InlineKeyboardButton("🔙  Выйти", callback_data='sports_close'))
+
+    nav_buttons.append(types.InlineKeyboardButton(
+        f"{page}/{total_pages}",
+        callback_data="ex_page_info"
+    ))
+
+    if page < total_pages:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "➡️ Вперед",
+            callback_data=f"sport_ex_all_page_{page + 1}_{category}_{difficulty}"
+        ))
+
+    keyboard.row(*nav_buttons)
+    return keyboard
+
+
+
+def sports_exercise_keyboard(exercise_id, is_favorite,category,difficulty):
+    """
+    Клавиатура действий с упражнением для пользователя
+    """
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+
+    # Основные действия
+    keyboard.add(
+        types.InlineKeyboardButton("✅ Выполнил", callback_data=f"sports_do_{exercise_id}"),
+        types.InlineKeyboardButton("📹 Видео", callback_data=f"ex_edit_open_video_{exercise_id}")
+    )
+
+    # Избранное
+    fav_text = "❤️ Убрать" if is_favorite else "🤍 В избранное"
+    keyboard.add(
+        types.InlineKeyboardButton(fav_text, callback_data=f"sports_fav_{exercise_id}")
+    )
+
+    # Статистика и навигация
+    keyboard.add(
+        types.InlineKeyboardButton("📊 Статистика", callback_data=f"sports_my_stats_{exercise_id}"),
+        types.InlineKeyboardButton("🔙 К списку", callback_data=f"sports_back_to_list_{category}_{difficulty}")
+    )
+
     return keyboard

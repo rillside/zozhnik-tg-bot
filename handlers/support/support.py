@@ -242,12 +242,22 @@ async def look_ticket_page(call, bot):
     else:
         type = None
         text = my_tickets_msg
-    await bot.delete_message(call.message.chat.id, call.message.message_id)
-    await bot.send_message(call.message.chat.id, text,
-                           reply_markup=opening_ticket_keyboard(
+    try:
+        await bot.edit_message_text(
+            text,
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=opening_ticket_keyboard(
                                role, await load_tickets_info(call.message.chat.id, role=role, type=type),
                                int(page))
-                           )
+        )
+    except:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+        await bot.send_message(call.message.chat.id, text,
+                               reply_markup=opening_ticket_keyboard(
+                                   role, await load_tickets_info(call.message.chat.id, role=role, type=type),
+                                   int(page))
+                               )
 
 
 async def admin_look_tickets(call, bot):

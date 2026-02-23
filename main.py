@@ -13,6 +13,8 @@ from handlers.sports.admin_exercises import exercise_management, start_add_exerc
     save_exercise, open_video, exercise_go_back, edit_exercise_start, edit_exercise_handle_category, \
     edit_exercise_show_list, open_exercise_for_edit, save_exercise_changes, handle_exercise_edit, \
     accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise
+from handlers.sports.user_exercises import sports_start, sports_check_all_start, sports_handle_category, \
+    sports_show_list, sports_show_exercise, toggle_favorite
 from utils.antispam import mark_group_warned, is_group_warned
 from utils.scheduler import Scheduler
 from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
@@ -37,7 +39,7 @@ from handlers.settings import set_reminder_type_water, water_smart_type_install,
 from handlers.sleeps import sleeps_main
 from handlers.stats import adm_stats, owner_stats
 from config import token, is_admin, is_owner
-from utils.fsm import user_states, get_state, set_state, clear_state
+from utils.fsm import user_states, get_state, set_state, clear_state, clear_state_keep_data
 
 bot = AsyncTeleBot(token,parse_mode = "Markdown")
 logging.basicConfig(
@@ -74,6 +76,7 @@ def error_handler(func):
 @bot.message_handler(commands=['start'])
 # @error_handler
 async def start(message):
+    clear_state(message.chat.id)
     user_is_admin = await is_admin(message.chat.id)
     logging.info(f"Пользователь {message.chat.id} запустил бота")
     if is_owner(message.chat.id):
@@ -184,8 +187,7 @@ async def msg(message):
                                        water_goal_not_set_msg,
                                        reply_markup=water_goal_not_set_keyboard())
         case "💪 Физ-активность":
-            pass
-            # await bot.send_message(message.chat.id, sports_main())
+            await sports_start(message,bot)
 
         case "😴 Сон":
             await bot.send_message(message.chat.id, sleeps_main())
@@ -375,7 +377,7 @@ async def callback_inline(call):
             await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
                                    reply_markup=supp_ticket_cancel_keyboard())
             set_state(call.message.chat.id,'waiting_ticket_title',type_supp)
-        case 'supp_exit':
+        case 'back_to_main':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)
             await bot.send_message(call.message.chat.id, exit_home(),
@@ -488,6 +490,23 @@ async def callback_inline(call):
             await stats_exercise(call,bot)
         case 'cancel_any':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+        case 'sports_check_all':
+            await sports_check_all_start(call,bot)
+        case 'sports_close':
+            await sports_start(call.message,bot,
+                               first_name=call.message.from_user.first_name
+                               )
+        case data if data.startswith('sports_category_'):
+            await sports_handle_category(call,bot)
+        case data if data.startswith('sports_difficulty_')\
+            or data.startswith('sport_ex_all_page_')\
+            or data.startswith('sports_back_to_list_'):
+            await sports_show_list(call,bot)
+        case data if data.startswith('sports_open_ex'):
+            await sports_show_exercise(call,bot)
+        case data if data.startswith('sports_fav_'):
+            await toggle_favorite(call,bot)
+
 
 
 

@@ -83,14 +83,26 @@ async def init_db():
             )
             ''')
         await conn.execute('''
-                        CREATE TABLE IF NOT EXISTS exercises_logs (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            user_id INTEGER,
-                            exercise_id INTEGER,
-                            date DATE DEFAULT CURRENT_DATE,
-                            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                            )
-                            ''')
+        CREATE TABLE IF NOT EXISTS exercises_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            exercise_id INTEGER,
+            date DATE DEFAULT CURRENT_DATE,
+            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE SET NULL
+            )
+            ''')
+        await conn.execute('''
+        CREATE TABLE IF NOT EXISTS exercises_user_favorites (
+            user_id INTEGER,
+            exercise_id INTEGER,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (user_id, exercise_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+            )
+            ''')
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS tickets (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -539,6 +551,17 @@ async def get_exercises_id_name(category, difficulty):
     return res
 
 
+async def get_active_exercises(category, difficulty):
+    """"Возвращает список кортежей (id, name)
+    всех упражнений по заданным фильтрам"""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT id,name FROM exercises WHERE category = ? AND difficulty = ? AND is_active = 1''',
+            (category, difficulty))
+        res = await cursor.fetchall()
+    return res
+
+
 async def get_exercise_by_id(exercise_id):
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT * FROM exercises WHERE id = ?''', (exercise_id,))
@@ -565,7 +588,9 @@ async def update_exercise_in_db(ex_id, db_field, new_value):
     async with get_connection() as conn:
         await conn.execute(f'''UPDATE exercises SET {db_field} = ? WHERE id = ?''',
                            (new_value, ex_id))
-async def delete_exercise_in_db (ex_id):
+
+
+async def delete_exercise_in_db(ex_id):
     async with get_connection() as conn:
         await conn.execute(f'''DELETE FROM exercises WHERE id = ?''',
                            (ex_id,))
@@ -615,3 +640,18 @@ async def get_exercise_stats():
             'popular': popular,
             'weekly': weekly
         }
+async def check_ex_is_favorite(ex_id,user_id):
+    """Проверяет, находится ли упражнение в избранном у пользователя."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT * FROM exercises_user_favorites WHERE exercise_id = ? AND user_id = ?''',
+                                    (ex_id, user_id))
+        res = await cursor.fetchone()
+        return bool(res)
+async def add_ex_to_favorite(user_id,ex_id):
+    async with get_connection() as conn:
+        await conn.execute('''INSERT INTO exercises_user_favorites (user_id,exercise_id) VALUES (?,?)''',
+                                    (user_id,ex_id))
+async def remove_ex_from_favorite(user_id,ex_id):
+    async with get_connection() as conn:
+        await conn.execute('''DELETE FROM exercises_user_favorites WHERE exercise_id = ? AND user_id = ?''',
+                           (ex_id, user_id))
