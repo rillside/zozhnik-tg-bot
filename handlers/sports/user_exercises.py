@@ -128,13 +128,14 @@ async def sports_show_exercise(call, bot):
         await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
         return
     ex_name, description, category, difficulty = ex_info[1:5]
+    file_id = ex_info[5]
     is_favorite = await check_ex_is_favorite(ex_id, call.message.chat.id)
     await bot.edit_message_text(
         sports_exercise_details_msg(ex_name, description, category,
-                                    difficulty, is_favorite),
+                                    difficulty, is_favorite, bool(file_id)),
         call.message.chat.id,
         call.message.message_id,
-        reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty)
+        reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty, has_video=bool(file_id))
     )
 async def toggle_favorite(call, bot):
     """
@@ -271,12 +272,13 @@ async def sports_show_exercise_for_ex_id(call, bot, ex_id):
         await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
         return
     ex_name, description, category, difficulty = ex_info[1:5]
+    file_id = ex_info[5]
     is_favorite = await check_ex_is_favorite(ex_id, call.message.chat.id)
     await bot.edit_message_text(
-        sports_exercise_details_msg(ex_name, description, category, difficulty, is_favorite),
+        sports_exercise_details_msg(ex_name, description, category, difficulty, is_favorite, bool(file_id)),
         call.message.chat.id,
         call.message.message_id,
-        reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty)
+        reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty, has_video=bool(file_id))
     )
 
 

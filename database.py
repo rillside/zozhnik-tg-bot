@@ -711,14 +711,14 @@ async def get_exercise_stats():
         total = (await cursor.fetchone())[0]
 
         # Общее количество выполнений
-        cursor = await conn.execute('SELECT COUNT(*) FROM user_exercises')
+        cursor = await conn.execute('SELECT COUNT(*) FROM exercises_logs')
         total_completions = (await cursor.fetchone())[0]
 
         # Самые популярные упражнения
         cursor = await conn.execute('''
-            SELECT e.name, COUNT(ue.id) as count 
+            SELECT e.name, COUNT(el.id) as count 
             FROM exercises e
-            LEFT JOIN user_exercises ue ON e.id = ue.exercise_id
+            LEFT JOIN exercises_logs el ON e.id = el.exercise_id
             WHERE e.is_active = 1
             GROUP BY e.id
             ORDER BY count DESC
@@ -728,7 +728,7 @@ async def get_exercise_stats():
 
         # Статистика за последние 7 дней
         cursor = await conn.execute('''
-            SELECT COUNT(*) FROM user_exercises 
+            SELECT COUNT(*) FROM exercises_logs 
             WHERE date >= DATE('now', '-7 days')
         ''')
         weekly = (await cursor.fetchone())[0]

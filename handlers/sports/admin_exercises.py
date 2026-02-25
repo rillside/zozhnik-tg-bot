@@ -33,7 +33,7 @@ def get_validated_data(user_id):
         file_id = data.get('video')
     else:
         return False
-    if not all([name, description, category, difficulty, file_id]):
+    if not all([name, description, category, difficulty]):
         return False
     return name, description, category, difficulty, file_id
 
@@ -76,9 +76,10 @@ async def handle_exercise_accept(user_id, bot):
             name,
             description,
             category,
-            difficulty
+            difficulty,
+            bool(file_id)
         ),
-        reply_markup=exercise_confirm_keyboard()
+        reply_markup=exercise_confirm_keyboard(has_video=bool(file_id))
     )
     return True
 
@@ -254,6 +255,23 @@ async def handle_exercise_video(message, bot):
     await handle_exercise_accept(message.chat.id, bot)
 
 
+async def skip_exercise_video(call, bot):
+    """Обработка нажатия Пропустить при добавлении упражнения (видео необязательно)"""
+    user_id = call.message.chat.id
+    state, data = get_state(user_id)
+    # Ожидаем, что пользователь на этапе добавления и выбрал сложность
+    if state != 'adding_exercise' or 'difficulty' not in data:
+        await bot.answer_callback_query(call.id, error_msg)
+        return
+    data.pop('video', None)
+    set_state(user_id, 'adding_exercise', data)
+    try:
+        await bot.delete_message(user_id, call.message.message_id)
+    except:
+        pass
+    await handle_exercise_accept(user_id, bot)
+
+
 async def open_video(call, bot, is_moment_of_creation=True):
     if is_moment_of_creation:
         res = get_validated_data(call.message.chat.id)
@@ -265,6 +283,9 @@ async def open_video(call, bot, is_moment_of_creation=True):
     else:
         exercise_id = call.data.split('_')[-1]
         file_id = await get_file_id_by_ex_id(exercise_id)
+    if not file_id:
+        await bot.answer_callback_query(call.id, 'Видео не прикреплено', show_alert=True)
+        return
     await bot.send_video(
         chat_id=call.message.chat.id,
         video=file_id,
@@ -367,8 +388,8 @@ async def open_exercise_for_edit(bot, call=None, ex_id=None, message=None):
         user_id,
         exercise_full_details_msg(ex_id, name, description, category,
                                   difficulty, created_by, created_at,
-                                  is_active),
-        reply_markup=exercise_edit_keyboard(ex_id, old_category, old_difficulty)
+                                  is_active, bool(file_id)),
+        reply_markup=exercise_edit_keyboard(ex_id, old_category, old_difficulty, has_video=bool(file_id))
     )
 
 

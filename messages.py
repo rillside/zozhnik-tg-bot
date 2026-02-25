@@ -655,7 +655,7 @@ def admin_exercise_menu_msg(first_name):
 ⚡ Все изменения сразу доступны пользователям!"""
 
 
-def exercise_confirm_msg(name, description, category, difficulty):
+def exercise_confirm_msg(name, description, category, difficulty, has_video=False):
     """Сообщение с данными упражнения для подтверждения"""
 
     # Словарь для отображения категорий
@@ -677,6 +677,8 @@ def exercise_confirm_msg(name, description, category, difficulty):
     cat_display = categories.get(category, category)
     diff_display = difficulties.get(difficulty, difficulty)
 
+    video_line = "📹 *Видео:* загружено" if has_video else "📹 Видео: не прикреплено"
+
     return f"""📋 *Проверьте данные упражнения*
 
 🏋️ *Название:* {name}
@@ -688,7 +690,7 @@ def exercise_confirm_msg(name, description, category, difficulty):
 
 📊 *Сложность:* {diff_display}
 
-📹 *Видео:* загружено
+{video_line}
 
 ✅ Всё верно? Подтвердите сохранение или отмените."""
 
@@ -713,7 +715,7 @@ def exercise_saved_msg(name):
 • Вернуться в меню"""
 
 
-def exercise_full_details_msg(ex_id, name, description, category, difficulty, created_by, created_at, is_active):
+def exercise_full_details_msg(ex_id, name, description, category, difficulty, created_by, created_at, is_active, has_video=False):
     """Формирует сообщение с полными данными упражнения"""
 
     # Словари для отображения
@@ -737,6 +739,8 @@ def exercise_full_details_msg(ex_id, name, description, category, difficulty, cr
     difficulty_display = difficulties.get(difficulty)
     status = "✅ Активно" if is_active else "❌ Неактивно"
 
+    video_line = 'прикреплено отдельно' if has_video else 'не прикреплено'
+
     return f"""🏋️ *Упражнение #{ex_id}*
 
 📝 *Название:* {name}
@@ -752,7 +756,7 @@ def exercise_full_details_msg(ex_id, name, description, category, difficulty, cr
 📌 *Статус:* {status}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-📹 *Видео:* прикреплено отдельно
+📹 *Видео:* {video_line}
 
 Выберите, что хотите изменить:"""
 
@@ -812,7 +816,7 @@ def sports_main_menu_msg(first_name, goal=None, today_count=0):
 Выбери раздел:"""
 
 
-def sports_exercise_details_msg(name, description, category, difficulty, is_favorite=False):
+def sports_exercise_details_msg(name, description, category, difficulty, is_favorite=False, has_video=False):
     """Формирует сообщение с деталями упражнения для пользователя"""
 
     categories = {
@@ -832,6 +836,8 @@ def sports_exercise_details_msg(name, description, category, difficulty, is_favo
 
     fav_emoji = "❤️" if is_favorite else "🤍"
 
+    video_line = "📹 *Видео:* прикреплено" if has_video else "📹 *Видео:* не прикреплено"
+
     return f"""🏋️ *{name}*
 
 📋 *Описание:*
@@ -842,10 +848,12 @@ def sports_exercise_details_msg(name, description, category, difficulty, is_favo
 
 {fav_emoji} *В избранном:* {'да' if is_favorite else 'нет'}
 
+{video_line}
+
 *Доступные действия:*
 
 ✅ *Выполнил* — отметить выполнение упражнения
-📹 *Видео* — посмотреть демонстрацию
+{('📹 *Видео* — посмотреть демонстрацию' if has_video else '')}
 {fav_emoji} *В избранное/убрать* — добавить или удалить из избранного
 📊 *Статистика* — твоя статистика по этому упражнению
 🔙 *К списку* — вернуться к списку упражнений

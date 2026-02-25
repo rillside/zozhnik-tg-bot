@@ -421,6 +421,9 @@ def exercise_navigation_keyboard(step):
     buttons = []
     if step > 1:
         buttons.append(types.InlineKeyboardButton("🔙 Назад", callback_data="add_exercise_back"))
+    # На шаге добавления видео даём возможность пропустить его
+    if step == 5:
+        buttons.append(types.InlineKeyboardButton("⏭️ Пропустить", callback_data="add_exercise_skip_video"))
     buttons.append(types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel"))
     keyboard.row(*buttons)
     return keyboard
@@ -476,14 +479,16 @@ def ex_difficulty_keyboard(mode='add',ex_id=None):
 
     return keyboard
 
-def exercise_confirm_keyboard():
+def exercise_confirm_keyboard(has_video=True):
     """Клавиатура подтверждения/отмены"""
     keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(types.InlineKeyboardButton('📷 Открыть видео',callback_data="exercise_confirm_open_video"))
+    if has_video:
+        keyboard.add(types.InlineKeyboardButton('📷 Открыть видео', callback_data="exercise_confirm_open_video"))
     keyboard.add(
         types.InlineKeyboardButton("✅ Подтвердить", callback_data="exercise_confirm_save"),
         types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel")
     )
+    return keyboard
     return keyboard
 def exercise_category_filter_keyboard():
     """Клавиатура выбора категории для редактирования упражнений"""
@@ -575,7 +580,7 @@ def no_exercises_keyboard():
 
 # keyboards.py
 
-def exercise_edit_keyboard(exercise_id, category, difficulty):
+def exercise_edit_keyboard(exercise_id, category, difficulty, has_video=False):
     """
     Клавиатура для редактирования упражнения
     """
@@ -592,10 +597,16 @@ def exercise_edit_keyboard(exercise_id, category, difficulty):
     )
 
     # Кнопки для видео
-    keyboard.row(
-        types.InlineKeyboardButton("📹 Открыть видео", callback_data=f"ex_edit_open_video_{exercise_id}"),
-        types.InlineKeyboardButton("📹 Заменить видео", callback_data=f"ex_edit_field_{exercise_id}_videochange")
-    )
+    if has_video:
+        keyboard.row(
+            types.InlineKeyboardButton("📹 Открыть видео", callback_data=f"ex_edit_open_video_{exercise_id}"),
+            types.InlineKeyboardButton("📹 Заменить видео", callback_data=f"ex_edit_field_{exercise_id}_videochange")
+        )
+    else:
+        # Если видео нет, показываем только замену (добавление)
+        keyboard.row(
+            types.InlineKeyboardButton("📹 Добавить видео", callback_data=f"ex_edit_field_{exercise_id}_videochange")
+        )
 
     # Кнопки статуса и удаления
     keyboard.add(
@@ -786,17 +797,18 @@ def sports_confirm_done_keyboard(ex_id):
     return keyboard
 
 
-def sports_exercise_keyboard(exercise_id, is_favorite,category,difficulty):
+def sports_exercise_keyboard(exercise_id, is_favorite,category,difficulty, has_video=False):
     """
     Клавиатура действий с упражнением для пользователя
     """
     keyboard = types.InlineKeyboardMarkup(row_width=2)
 
     # Основные действия
-    keyboard.add(
-        types.InlineKeyboardButton("✅ Выполнил", callback_data=f"sports_do_{exercise_id}"),
-        types.InlineKeyboardButton("📹 Видео", callback_data=f"ex_edit_open_video_{exercise_id}")
-    )
+    # Основные действия
+    main_buttons = [types.InlineKeyboardButton("✅ Выполнил", callback_data=f"sports_do_{exercise_id}")]
+    if has_video:
+        main_buttons.append(types.InlineKeyboardButton("📹 Видео", callback_data=f"ex_edit_open_video_{exercise_id}"))
+    keyboard.add(*main_buttons)
 
     # Избранное
     fav_text = "❤️ Убрать" if is_favorite else "🤍 В избранное"

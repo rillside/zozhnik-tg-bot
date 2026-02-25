@@ -12,12 +12,13 @@ from handlers.sports.admin_exercises import exercise_management, start_add_exerc
     handle_exercise_description, handle_exercise_category, handle_exercise_difficulty, handle_exercise_video, \
     save_exercise, open_video, exercise_go_back, edit_exercise_start, edit_exercise_handle_category, \
     edit_exercise_show_list, open_exercise_for_edit, save_exercise_changes, handle_exercise_edit, \
-    accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise
+    accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise, skip_exercise_video
 from handlers.sports.user_exercises import sports_start, sports_check_all_start, sports_handle_category, \
     sports_show_list, sports_show_exercise, toggle_favorite, sports_check_favorites_start, \
     sports_show_favorites_page, sports_back_to_categories, sports_back_to_main, sports_mark_done, \
     sports_confirm_done, sports_cancel_done, sports_show_my_stats, sports_show_exercise_stats
 from utils.antispam import mark_group_warned, is_group_warned
+from utils.censorship.checker import censor_load
 from utils.scheduler import Scheduler
 from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
     handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page, \
@@ -45,7 +46,6 @@ from handlers.sleeps import sleeps_main
 from handlers.stats import adm_stats, owner_stats
 from config import token, is_admin, is_owner
 from utils.fsm import user_states, get_state, set_state, clear_state
-
 bot = AsyncTeleBot(token, parse_mode="Markdown")
 logging.basicConfig(
     level=logging.INFO,
@@ -504,6 +504,8 @@ async def callback_inline(call):
             await handle_exercise_difficulty(call, bot)
         case 'exercise_confirm_open_video':
             await open_video(call, bot)
+        case 'add_exercise_skip_video':
+            await skip_exercise_video(call, bot)
         case 'exercise_confirm_save':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await save_exercise(call.message.chat.id, call.message.from_user.username, bot)
@@ -587,6 +589,7 @@ async def start_bot():
     await init_db()
     reminder_service = Scheduler(bot)
     await reminder_service.start()
+    await censor_load()
     while True:
         try:
             logging.info("Бот запущен")

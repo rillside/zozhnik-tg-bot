@@ -7,20 +7,24 @@ from utils.censorship.word_filter import banned_words, banned_phrases
 from config import ai_censor_enabled, censorship_threshold, is_owner, owners, save_owners
 
 _logger = logging.getLogger(__name__)
-if ai_censor_enabled:
-    try:
-        _logger.info("Начата загрузка AI модели...")
-        from detoxify import Detoxify
-        toxicity_checker = Detoxify('original')  # Модель unitary/toxic-bert
-        _logger.info("AI Модель загружена")
-    except Exception as e:
-        _logger.warn(f"Ошибка загрузки Detoxify. AI цензура отключена\n{e}")
+toxicity_checker = None
+async def censor_load():
+    global toxicity_checker
+    if ai_censor_enabled:
+        try:
+            _logger.info("Начата загрузка AI модели...")
+            from detoxify import Detoxify
+            toxicity_checker = Detoxify('original')  # Модель unitary/toxic-bert
+            _logger.info("AI Модель загружена")
+        except Exception as e:
+            _logger.warn(f"Ошибка загрузки Detoxify. AI цензура отключена\n{e}")
+            toxicity_checker = None
+    else:
         toxicity_checker = None
-else:
-    toxicity_checker = None
-    _logger.info("AI цензура отключена")
+        _logger.info("AI цензура отключена")
 
 async def ai_censor(text):
+
     if toxicity_checker is None:
         return False
 
