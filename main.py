@@ -14,7 +14,9 @@ from handlers.sports.admin_exercises import exercise_management, start_add_exerc
     edit_exercise_show_list, open_exercise_for_edit, save_exercise_changes, handle_exercise_edit, \
     accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise
 from handlers.sports.user_exercises import sports_start, sports_check_all_start, sports_handle_category, \
-    sports_show_list, sports_show_exercise, toggle_favorite
+    sports_show_list, sports_show_exercise, toggle_favorite, sports_check_favorites_start, \
+    sports_show_favorites_page, sports_back_to_categories, sports_back_to_main, sports_mark_done, \
+    sports_confirm_done, sports_cancel_done, sports_show_my_stats, sports_show_exercise_stats
 from utils.antispam import mark_group_warned, is_group_warned
 from utils.scheduler import Scheduler
 from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
@@ -26,22 +28,25 @@ from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_ca
     timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
     technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
     admin_ticket_section_keyboard, water_goal_not_set_keyboard, admin_exercise_keyboard, \
-    exercise_category_filter_keyboard
+     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
+    activity_setup_required_msg, activity_goal_selection_msg, activity_tracker_setup_msg, \
     add_new_adm_msg, remove_adm_msg, \
     error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
     water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
     support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
-    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, exercise_saved_msg, \
-    exercise_cancel_msg, media_is_closed_msg, edit_exercise_category_msg
+    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, \
+    exercise_cancel_msg, media_is_closed_msg
 from handlers.settings import set_reminder_type_water, water_smart_type_install, \
-    water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg
+    water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg, activity_settings_open, \
+    activity_reminder_open, activity_smart_type_install, activity_interval_open, activity_setting_interval, \
+    activity_goal_settings, activity_goal_custom_stg, activity_stg_cancel
 from handlers.sleeps import sleeps_main
 from handlers.stats import adm_stats, owner_stats
 from config import token, is_admin, is_owner
-from utils.fsm import user_states, get_state, set_state, clear_state, clear_state_keep_data
+from utils.fsm import user_states, get_state, set_state, clear_state
 
-bot = AsyncTeleBot(token,parse_mode = "Markdown")
+bot = AsyncTeleBot(token, parse_mode="Markdown")
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -101,7 +106,7 @@ async def start(message):
                                )
 
 
-@bot.message_handler(content_types=['text'],func=lambda msg: user_states.get(msg.chat.id) is not None)
+@bot.message_handler(content_types=['text'], func=lambda msg: user_states.get(msg.chat.id) is not None)
 async def state_handler(message):
     state, data = get_state(message.chat.id)
     match state:
@@ -115,22 +120,26 @@ async def state_handler(message):
         case 'waiting_ticket_title':
             await create_ticket(message, bot, data)
         case 'waiting_send_msg_to_ticket':
-            await send_message_to_ticket(message,bot,*data)
+            await send_message_to_ticket(message, bot, *data)
         case 'waiting_add_water':
             await add_custom_water(message, bot)
         case 'waiting_custom_water_goal':
             await water_goal_custom_stg(bot, message, *data)
+        case 'waiting_custom_activity_goal':
+            await activity_goal_custom_stg(bot, message, *data)
         case 'adding_exercise':
             if data == {}:
-                await handle_exercise_name(message,bot)
+                await handle_exercise_name(message, bot)
             elif 'name' in data and 'description' not in data:
-                await handle_exercise_description(message,bot)
+                await handle_exercise_description(message, bot)
         case 'waiting_new_exercise_field':
             if 'action' in data and 'ex_id' in data:
-                await save_exercise_changes(bot,message=message)
+                await save_exercise_changes(bot, message=message)
 
 
 _locks = {}
+
+
 @bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
 async def handle_photo_with_state(message):
     state, data = get_state(message.chat.id)
@@ -151,9 +160,10 @@ async def handle_photo_with_state(message):
     caption = message.caption if message.caption else None
     match state:
         case 'waiting_broadcast_text':
-            await accept_broadcast(message, bot,'photo', file_id,caption)
+            await accept_broadcast(message, bot, 'photo', file_id, caption)
         case 'waiting_send_msg_to_ticket':
-            await send_message_to_ticket(message,bot,*data,type_msg='photo',file_id=file_id,caption=caption)
+            await send_message_to_ticket(message, bot, *data, type_msg='photo', file_id=file_id, caption=caption)
+
 
 @bot.message_handler(content_types=['video', 'animation'], func=lambda msg: user_states.get(msg.chat.id))
 async def handle_video_with_state(message):
@@ -161,10 +171,10 @@ async def handle_video_with_state(message):
     match state:
         case 'adding_exercise':
             if 'difficulty' in data:
-                await handle_exercise_video(message,bot)
+                await handle_exercise_video(message, bot)
         case 'waiting_new_exercise_field':
             if 'action' in data and 'ex_id' in data:
-                await save_exercise_changes(bot,message=message)
+                await save_exercise_changes(bot, message=message)
 
 
 @bot.message_handler(content_types=['text'])
@@ -187,7 +197,14 @@ async def msg(message):
                                        water_goal_not_set_msg,
                                        reply_markup=water_goal_not_set_keyboard())
         case "💪 Физ-активность":
-            await sports_start(message,bot)
+            if await count_users_trackers('track_activity', 'goal_exercises', message.chat.id):
+                await sports_start(message, bot)
+            else:
+                await bot.send_message(
+                    message.chat.id,
+                    activity_setup_required_msg,
+                    reply_markup=activity_goal_not_set_keyboard()
+                )
 
         case "😴 Сон":
             await bot.send_message(message.chat.id, sleeps_main())
@@ -222,7 +239,7 @@ async def msg(message):
                                    example_broadcast, reply_markup=cancel_br_start())
             set_state(message.chat.id, 'waiting_broadcast_text', None)
         case '💪 Управление упражнениями' if await is_admin(message.chat.id):
-            await exercise_management(message,bot)
+            await exercise_management(message, bot)
         case '👨‍⚕️ Обращения' if await is_admin(message.chat.id):
             await bot.send_message(message.chat.id,
                                    admin_ticket_section_msg(
@@ -252,8 +269,8 @@ async def callback_inline(call):
             if type_broadcast == 'msg':
                 await broadcast_send(call, bot)
             elif type_broadcast == 'photo':
-                file_id,caption = get_state(call.message.chat.id)[1]
-                await broadcast_send(call, bot,'photo',file_id,caption)
+                file_id, caption = get_state(call.message.chat.id)[1]
+                await broadcast_send(call, bot, 'photo', file_id, caption)
             elif type_broadcast == 'media_group':
                 pass
             await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -273,7 +290,8 @@ async def callback_inline(call):
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             clear_state(call.message.chat.id)
             await bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            await bot.send_message(call.message.chat.id, await owner_stats(), reply_markup=owner_menu(await get_all_admin()))
+            await bot.send_message(call.message.chat.id, await owner_stats(),
+                                   reply_markup=owner_menu(await get_all_admin()))
         case 'br_start_cancel':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             clear_state(call.message.chat.id)
@@ -289,7 +307,7 @@ async def callback_inline(call):
                 reply_markup=water_setup_keyboard()
             )
         case 'activity_settings':
-            pass
+            await activity_settings_open(call, bot)
         case 'dream_settings':
             pass
 
@@ -341,6 +359,44 @@ async def callback_inline(call):
                 settings_msg(call.message.from_user.first_name),
                 reply_markup=settings_keyboard()
             )
+        case 'activity_goal':
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await bot.send_message(
+                call.message.chat.id,
+                activity_goal_selection_msg(call.from_user.first_name),
+                reply_markup=activity_goal_keyboard()
+            )
+        case 'activity_reminder':
+            await activity_reminder_open(call, bot)
+        case 'activity_type_smart':
+            await activity_smart_type_install(call, bot)
+        case 'activity_type_interval':
+            await activity_interval_open(call, bot)
+        case data if data.startswith('activity_interval_'):
+            last = data.split('_')[-1]
+            step = 'exit' if last == 'exit' else 'install'
+            await activity_setting_interval(call, bot, step)
+        case 'activity_reminder_exit':
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await bot.answer_callback_query(call.id, cancellation, show_alert=False)
+            await bot.send_message(
+                call.message.chat.id,
+                activity_tracker_setup_msg(call.from_user.first_name),
+                reply_markup=activity_setup_keyboard()
+            )
+        case data if data.startswith('activity_goal_'):
+            last = data.split('_')[-1]
+            if last == 'custom':
+                step = 'set_goal_custom'
+            elif last == 'exit':
+                step = 'exit'
+            elif last == 'cancel':
+                step = 'cancel_custom'
+            else:
+                step = 'set_goal'
+            await activity_goal_settings(call, bot, step)
+        case 'activity_stg_cancel':
+            await activity_stg_cancel(call, bot)
         case 'cancel_settings' | 'water_add_exit':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)
@@ -376,7 +432,7 @@ async def callback_inline(call):
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
                                    reply_markup=supp_ticket_cancel_keyboard())
-            set_state(call.message.chat.id,'waiting_ticket_title',type_supp)
+            set_state(call.message.chat.id, 'waiting_ticket_title', type_supp)
         case 'back_to_main':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)
@@ -410,7 +466,7 @@ async def callback_inline(call):
                 await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
         case data if data.startswith('opening_photo_'):
             msg_id = data.split('_')[2]
-            await opening_photo_in_ticket(call,bot, msg_id)
+            await opening_photo_in_ticket(call, bot, msg_id)
         case data if data.startswith('ticket_exit'):
             await ticket_exit(call, bot)
         case 'adm_tickets_tech' | 'adm_tickets_consult':
@@ -445,81 +501,86 @@ async def callback_inline(call):
         case data if data.startswith('add_exercise_category_'):
             await handle_exercise_category(call, bot)
         case data if data.startswith('add_exercise_difficulty_'):
-            await handle_exercise_difficulty(call,bot)
+            await handle_exercise_difficulty(call, bot)
         case 'exercise_confirm_open_video':
             await open_video(call, bot)
         case 'exercise_confirm_save':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            await save_exercise(call.message.chat.id,call.message.from_user.username,bot)
+            await save_exercise(call.message.chat.id, call.message.from_user.username, bot)
             clear_state(call.message.chat.id)
         case 'add_exercise_back':
             await exercise_go_back(call, bot)
         case 'add_exercise_cancel':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            await bot.send_message(call.message.chat.id,exercise_cancel_msg,
+            await bot.send_message(call.message.chat.id, exercise_cancel_msg,
                                    reply_markup=admin_exercise_keyboard())
             clear_state(call.message.chat.id)
-        case 'admin_exercise_edit' | 'edit_exercise_back_to_categories' :
+        case 'admin_exercise_edit' | 'edit_exercise_back_to_categories':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await edit_exercise_start(call, bot)
         case data if data.startswith('filter_edit_exercise_category_'):
-            await edit_exercise_handle_category(call,bot)
-        case data if (data.startswith('filter_edit_exercise_difficulty_') #Первое открытие списка
-                      or data.startswith('edit_exercises_page_') #Переход между страницами
-                      or data.startswith('edit_exercise_back_to_list_')): #После закрытия др. Упражнения
-            await edit_exercise_show_list(call,bot)
+            await edit_exercise_handle_category(call, bot)
+        case data if (data.startswith('filter_edit_exercise_difficulty_')  # Первое открытие списка
+                      or data.startswith('edit_exercises_page_')  # Переход между страницами
+                      or data.startswith('edit_exercise_back_to_list_')):  # После закрытия др. Упражнения
+            await edit_exercise_show_list(call, bot)
         case data if data.startswith('edit_exercise_select_'):
-            await open_exercise_for_edit(call=call,bot=bot)
+            await open_exercise_for_edit(call=call, bot=bot)
         case 'edit_exercise_cancel':
             clear_state(call.message.chat.id)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            await exercise_management(call.message, bot,call.from_user.first_name)
+            await exercise_management(call.message, bot, call.from_user.first_name)
         case data if data.startswith('ex_edit_open_video_'):
-            await open_video(call,bot,is_moment_of_creation=False)
+            await open_video(call, bot, is_moment_of_creation=False)
         case data if data.startswith('ex_edit_field_'):
-            await handle_exercise_edit(call,bot)
+            await handle_exercise_edit(call, bot)
         case data if data.startswith('edit_exercise_category') or data.startswith('edit_exercise_difficulty'):
-            await save_exercise_changes(bot,call=call)
+            await save_exercise_changes(bot, call=call)
         case data if data.startswith('ex_edit_delete_'):
-            await accept_delete_exercise(call,bot)
+            await accept_delete_exercise(call, bot)
         case data if data.startswith('confirm_delete_ex_'):
-            await delete_exercise(call,bot)
+            await delete_exercise(call, bot)
         case data if data.startswith('cancel_delete_ex_'):
-            await cancel_delete_exercise(call,bot)
+            await cancel_delete_exercise(call, bot)
         case 'admin_exercise_stats':
-            await stats_exercise(call,bot)
+            await stats_exercise(call, bot)
         case 'cancel_any':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'sports_check_all':
-            await sports_check_all_start(call,bot)
+            await sports_check_all_start(call, bot)
+        case 'sports_check_favorites':
+            await sports_check_favorites_start(call, bot)
+        case 'sports_check_my_stats':
+            await sports_show_my_stats(call, bot)
         case 'sports_close':
-            await sports_start(call.message,bot,
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await sports_start(call.message, bot,
                                first_name=call.message.from_user.first_name
                                )
+        case 'sports_back_to_main':
+            await sports_back_to_main(call, bot)
+        case 'sports_back_to_categories':
+            await sports_back_to_categories(call, bot)
+        case data if data.startswith('sport_ex_fav_page_'):
+            await sports_show_favorites_page(call, bot)
         case data if data.startswith('sports_category_'):
-            await sports_handle_category(call,bot)
-        case data if data.startswith('sports_difficulty_')\
-            or data.startswith('sport_ex_all_page_')\
-            or data.startswith('sports_back_to_list_'):
-            await sports_show_list(call,bot)
+            await sports_handle_category(call, bot)
+        case data if data.startswith('sports_difficulty_') \
+                     or data.startswith('sport_ex_all_page_') \
+                     or data.startswith('sports_back_to_list_'):
+            await sports_show_list(call, bot)
         case data if data.startswith('sports_open_ex'):
-            await sports_show_exercise(call,bot)
+            await sports_show_exercise(call, bot)
         case data if data.startswith('sports_fav_'):
-            await toggle_favorite(call,bot)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            await toggle_favorite(call, bot)
+        case data if data.startswith('sports_do_'):
+            await sports_mark_done(call, bot)
+        case data if data.startswith('sports_confirm_do_'):
+            await sports_confirm_done(call, bot)
+        case data if data.startswith('sports_cancel_do_'):
+            await sports_cancel_done(call, bot)
+        case data if data.startswith('sports_my_stats_'):
+            await sports_show_exercise_stats(call, bot)
 
 
 async def start_bot():

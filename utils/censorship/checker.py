@@ -6,24 +6,19 @@ from handlers.admin_notifications import admin_censorship_violation
 from utils.censorship.word_filter import banned_words, banned_phrases
 from config import ai_censor_enabled, censorship_threshold, is_owner, owners, save_owners
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    force=True
-)
+_logger = logging.getLogger(__name__)
 if ai_censor_enabled:
     try:
-        logging.info("Начата загрузка AI модели...")
+        _logger.info("Начата загрузка AI модели...")
         from detoxify import Detoxify
         toxicity_checker = Detoxify('original')  # Модель unitary/toxic-bert
-        logging.info("AI Модель загружена")
+        _logger.info("AI Модель загружена")
     except Exception as e:
-        logging.warn(f"Ошибка загрузки Detoxify. AI цензура отключена\n{e}")
+        _logger.warn(f"Ошибка загрузки Detoxify. AI цензура отключена\n{e}")
         toxicity_checker = None
 else:
     toxicity_checker = None
-    logging.info("AI цензура отключена")
+    _logger.info("AI цензура отключена")
 
 async def ai_censor(text):
     if toxicity_checker is None:
@@ -38,7 +33,7 @@ async def ai_censor(text):
         )
         return any(score > censorship_threshold for score in result.values())
     except Exception as e:
-        logging.warn(f"Ошибка при работе AI цензуры: {e}")
+        _logger.warn(f"Ошибка при работе AI цензуры: {e}")
         return False
 
 

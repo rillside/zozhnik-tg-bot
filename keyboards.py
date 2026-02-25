@@ -146,6 +146,66 @@ def get_water_reminder_type_keyboard():
     return keyboard
 
 
+def activity_setup_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton("🎯 Цель на день", callback_data='activity_goal'),
+        types.InlineKeyboardButton("⏰ Напоминания", callback_data='activity_reminder')
+    )
+    keyboard.add(types.InlineKeyboardButton("🚶 Назад", callback_data='activity_stg_cancel'))
+    return keyboard
+
+
+def activity_goal_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton("1", callback_data='activity_goal_1'),
+        types.InlineKeyboardButton("3", callback_data='activity_goal_3'),
+        types.InlineKeyboardButton("5", callback_data='activity_goal_5'),
+        types.InlineKeyboardButton("10", callback_data='activity_goal_10')
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("✏️ Своя цель", callback_data='activity_goal_custom'),
+        types.InlineKeyboardButton("↩️ Назад", callback_data='activity_goal_exit')
+    )
+    return keyboard
+
+
+def activity_goal_custom_cancel():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("❌ Отмена", callback_data='activity_goal_custom_cancel'))
+    return keyboard
+
+
+def activity_goal_not_set_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton('⚙️ Настроить', callback_data='activity_settings'))
+    return keyboard
+
+
+def activity_reminder_type_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton("⏰ По интервалу", callback_data='activity_type_interval'),
+        types.InlineKeyboardButton("🤖 Умный режим", callback_data='activity_type_smart')
+    )
+    keyboard.add(types.InlineKeyboardButton("🔙 Назад", callback_data='activity_reminder_exit'))
+    return keyboard
+
+
+def activity_interval_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(
+        types.InlineKeyboardButton("1ч", callback_data='activity_interval_1'),
+        types.InlineKeyboardButton("2ч", callback_data='activity_interval_2'),
+        types.InlineKeyboardButton("3ч", callback_data='activity_interval_3'),
+        types.InlineKeyboardButton("4ч", callback_data='activity_interval_4'),
+        types.InlineKeyboardButton("5ч", callback_data='activity_interval_5')
+    )
+    keyboard.add(types.InlineKeyboardButton("🔙 Назад", callback_data='activity_interval_exit'))
+    return keyboard
+
+
 def get_water_interval_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     water_interval_1h = types.InlineKeyboardButton("1️⃣ 1ч", callback_data='water_interval_1h')
@@ -676,6 +736,54 @@ def sports_all_pagination_keyboard(exercise_list,category,difficulty,page=1):
     keyboard.row(*nav_buttons)
     return keyboard
 
+
+def sports_favorites_pagination_keyboard(exercise_list, page=1):
+    """Клавиатура списка избранных упражнений с пагинацией."""
+    if not exercise_list:
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton("🔙 Назад", callback_data="sports_back_to_main"))
+        return keyboard
+    total_pages = max(1, -(-len(exercise_list) // 10))
+    first = (page - 1) * 10
+    last = first + 10
+    keyboard = types.InlineKeyboardMarkup()
+    for ex_id, name in exercise_list[first:last]:
+        keyboard.row(
+            types.InlineKeyboardButton(f"📋 {name}", callback_data=f"sports_open_ex_{ex_id}")
+        )
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "⬅️ Назад", callback_data=f"sport_ex_fav_page_{page - 1}"
+        ))
+    else:
+        nav_buttons.append(types.InlineKeyboardButton("🔙 Выйти", callback_data="sports_back_to_main"))
+    nav_buttons.append(types.InlineKeyboardButton(
+        f"{page}/{total_pages}", callback_data="ex_page_info"
+    ))
+    if page < total_pages:
+        nav_buttons.append(types.InlineKeyboardButton(
+            "➡️ Вперед", callback_data=f"sport_ex_fav_page_{page + 1}"
+        ))
+    keyboard.row(*nav_buttons)
+    return keyboard
+
+
+def sports_favorites_empty_keyboard():
+    """Клавиатура для пустого избранного."""
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("🔙 Назад", callback_data="sports_back_to_main"))
+    return keyboard
+
+
+def sports_confirm_done_keyboard(ex_id):
+    """Клавиатура подтверждения выполнения упражнения."""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("✅ Подтвердить", callback_data=f"sports_confirm_do_{ex_id}"),
+        types.InlineKeyboardButton("❌ Отмена", callback_data=f"sports_cancel_do_{ex_id}")
+    )
+    return keyboard
 
 
 def sports_exercise_keyboard(exercise_id, is_favorite,category,difficulty):

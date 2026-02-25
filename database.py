@@ -3,7 +3,7 @@ import aiosqlite
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
-
+_logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def get_connection():
     conn = None
@@ -68,6 +68,21 @@ async def init_db():
             )
             ''')
 
+        await conn.execute('''
+        CREATE TABLE IF NOT EXISTS track_activity (
+            user_id INTEGER PRIMARY KEY,
+            timezone INTEGER,
+            goal_exercises INTEGER,
+            broadcast_type TEXT,
+            broadcast_interval INTEGER,
+            last_broadcast TIMESTAMP,
+            last_inactivity_reminder TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+        )
+        ''')
+        await conn.execute('''
+        INSERT OR IGNORE INTO track_activity (user_id) SELECT user_id FROM users
+        ''')
         await conn.execute('''
         CREATE TABLE IF NOT EXISTS exercises (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,10 +160,9 @@ async def add_user(user_id, username, status):
                 INSERT INTO users (user_id, username, status) 
                 VALUES (?, ?, ?)
             ''', (user_id, username, status))
-            await conn.execute('''INSERT INTO track_water (user_id)
-                              VALUES (?) '''
-                               , (user_id,))
-            logging.info(f"Added new user: {user_id} - {'@' + username} - {status}")
+            await conn.execute('''INSERT INTO track_water (user_id) VALUES (?)''', (user_id,))
+            await conn.execute('''INSERT INTO track_activity (user_id) VALUES (?)''', (user_id,))
+            _logger.info(f"Added new user: {user_id} - {'@' + username} - {status}")
 
 
 async def all_users():
@@ -356,6 +370,7 @@ async def set_timezone(user_id, new_timezone):
     async with get_connection() as conn:
         await conn.execute('UPDATE users SET timezone = ? WHERE user_id = ? ', (new_timezone, user_id))
         await conn.execute('UPDATE track_water SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
+        await conn.execute('UPDATE track_activity SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
 
 
 async def get_timezone(user_id):
@@ -368,8 +383,9 @@ async def get_timezone(user_id):
 async def get_user_time_now(user_id):
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT timezone FROM users WHERE user_id = ?', (user_id,))
-        hours_diff = await cursor.fetchone()
-    return datetime.now() + timedelta(hours=hours_diff[0])
+        row = await cursor.fetchone()
+    tz = row[0] if row and row[0] is not None else 0
+    return datetime.now() + timedelta(hours=tz)
 
 
 async def update_last_add_water_ml(user_id):
@@ -524,6 +540,89 @@ async def get_users_for_water_reminders():
     return result
 
 
+async def get_activity_goal_and_today_count(user_id):
+    """Возвращает (goal_exercises, today_count) или (None, 0) если цель не задана."""
+    today = await get_user_time_now(user_id)
+    today_str = today.strftime('%Y-%m-%d')
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            'SELECT goal_exercises FROM track_activity WHERE user_id = ?', (user_id,)
+        )
+        row = await cursor.fetchone()
+        if not row or row[0] is None:
+            return None, 0
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM exercises_logs WHERE user_id = ? AND date = ?''',
+            (user_id, today_str)
+        )
+        count = (await cursor.fetchone())[0]
+    return row[0], count
+
+
+async def update_activity_goal(user_id, goal):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_activity SET goal_exercises = ? WHERE user_id = ?',
+            (goal, user_id)
+        )
+
+
+async def activity_set_reminder_type(user_id, broadcast_type, broadcast_interval=None):
+    async with get_connection() as conn:
+        if broadcast_type == 'Smart':
+            await conn.execute(
+                '''UPDATE track_activity SET broadcast_type = ?, broadcast_interval = NULL,
+                   last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?''',
+                (broadcast_type, user_id)
+            )
+        else:
+            await conn.execute(
+                '''UPDATE track_activity SET broadcast_type = ?, broadcast_interval = ?,
+                   last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?''',
+                (broadcast_type, broadcast_interval, user_id)
+            )
+
+
+async def update_activity_reminder_sent_time(user_id):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_activity SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (user_id,)
+        )
+
+
+async def get_users_for_activity_reminders():
+    async with get_connection() as conn:
+        cursor = await conn.execute('''
+            SELECT user_id, broadcast_type, broadcast_interval, last_broadcast
+            FROM track_activity
+            WHERE broadcast_type IS NOT NULL AND goal_exercises IS NOT NULL
+        ''')
+        return await cursor.fetchall()
+
+
+async def get_inactive_users_for_reminder():
+    """Пользователи: last_activity > 4 дней, и last_inactivity_reminder NULL или > 4 дней."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''
+            SELECT u.user_id
+            FROM users u
+            LEFT JOIN track_activity a ON u.user_id = a.user_id
+            WHERE u.last_activity < datetime('now', '-4 days')
+              AND (a.last_inactivity_reminder IS NULL
+                   OR a.last_inactivity_reminder < datetime('now', '-4 days'))
+        ''')
+        return [row[0] for row in await cursor.fetchall()]
+
+
+async def update_last_inactivity_reminder(user_id):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_activity SET last_inactivity_reminder = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (user_id,)
+        )
+
+
 async def is_exercise_name_exists(name):
     """Проверяет, есть ли уже упражнение с таким названием"""
     async with get_connection() as conn:
@@ -640,18 +739,102 @@ async def get_exercise_stats():
             'popular': popular,
             'weekly': weekly
         }
-async def check_ex_is_favorite(ex_id,user_id):
+
+
+async def check_ex_is_favorite(ex_id, user_id):
     """Проверяет, находится ли упражнение в избранном у пользователя."""
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT * FROM exercises_user_favorites WHERE exercise_id = ? AND user_id = ?''',
                                     (ex_id, user_id))
         res = await cursor.fetchone()
         return bool(res)
-async def add_ex_to_favorite(user_id,ex_id):
+
+
+async def add_ex_to_favorite(user_id, ex_id):
     async with get_connection() as conn:
         await conn.execute('''INSERT INTO exercises_user_favorites (user_id,exercise_id) VALUES (?,?)''',
-                                    (user_id,ex_id))
-async def remove_ex_from_favorite(user_id,ex_id):
+                           (user_id, ex_id))
+
+
+async def remove_ex_from_favorite(user_id, ex_id):
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM exercises_user_favorites WHERE exercise_id = ? AND user_id = ?''',
                            (ex_id, user_id))
+
+
+async def get_favorite_exercises(user_id):
+    """Возвращает список (id, name) избранных активных упражнений пользователя."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''
+            SELECT e.id, e.name FROM exercises e
+            INNER JOIN exercises_user_favorites f ON e.id = f.exercise_id
+            WHERE f.user_id = ? AND e.is_active = 1
+            ORDER BY f.added_at DESC
+        ''', (user_id,))
+        return await cursor.fetchall()
+
+
+async def add_exercise_log(user_id, exercise_id):
+    """Добавляет запись о выполнении упражнения."""
+    async with get_connection() as conn:
+        await conn.execute(
+            '''INSERT INTO exercises_logs (user_id, exercise_id) VALUES (?, ?)''',
+            (user_id, exercise_id)
+        )
+
+
+async def get_last_exercise_log(user_id):
+    """Возвращает (exercise_id, time) последней записи о выполнении пользователем или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT exercise_id, time FROM exercises_logs 
+               WHERE user_id = ? ORDER BY time DESC LIMIT 1''',
+            (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_user_exercise_stats(user_id):
+    """Статистика выполнения упражнений пользователем."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM exercises_logs WHERE user_id = ?''',
+            (user_id,)
+        )
+        total = (await cursor.fetchone())[0]
+
+        cursor = await conn.execute('''
+            SELECT COUNT(*) FROM exercises_logs 
+            WHERE user_id = ? AND date >= DATE('now', '-7 days')
+        ''', (user_id,))
+        weekly = (await cursor.fetchone())[0]
+
+        cursor = await conn.execute('''
+            SELECT e.name, COUNT(el.id) as cnt FROM exercises_logs el
+            JOIN exercises e ON e.id = el.exercise_id
+            WHERE el.user_id = ?
+            GROUP BY el.exercise_id
+            ORDER BY cnt DESC
+            LIMIT 5
+        ''', (user_id,))
+        top = await cursor.fetchall()
+
+        return {'total': total, 'weekly': weekly, 'top': top}
+
+
+async def get_user_exercise_stats_for_exercise(user_id, exercise_id):
+    """Статистика выполнения конкретного упражнения пользователем."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''
+            SELECT COUNT(*) FROM exercises_logs 
+            WHERE user_id = ? AND exercise_id = ?
+        ''', (user_id, exercise_id))
+        total = (await cursor.fetchone())[0]
+
+        cursor = await conn.execute('''
+            SELECT COUNT(*) FROM exercises_logs 
+            WHERE user_id = ? AND exercise_id = ? AND date >= DATE('now', '-7 days')
+        ''', (user_id, exercise_id))
+        weekly = (await cursor.fetchone())[0]
+
+        return {'total': total, 'weekly': weekly}
