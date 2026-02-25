@@ -2,6 +2,23 @@ from config import owners
 from database import get_username_by_id
 
 
+def plural_days(count):
+    """Возвращает правильное склонение слова "день" для числа count."""
+
+    # Особые случаи для чисел 11-19
+    if 11 <= count % 100 <= 19:
+        return f"{count} дней"
+
+    # Для остальных смотрим последнюю цифру
+    last_digit = count % 10
+
+    if last_digit == 1:
+        return f"{count} день"
+    elif 2 <= last_digit <= 4:
+        return f"{count} дня"
+    else:
+        return f"{count} дней"
+
 def timezone_selection_msg(first_name):
     return f"""📍 Настройка часового пояса
 
@@ -715,7 +732,8 @@ def exercise_saved_msg(name):
 • Вернуться в меню"""
 
 
-def exercise_full_details_msg(ex_id, name, description, category, difficulty, created_by, created_at, is_active, has_video=False):
+def exercise_full_details_msg(ex_id, name, description, category, difficulty, created_by, created_at, is_active,
+                              has_video=False):
     """Формирует сообщение с полными данными упражнения"""
 
     # Словари для отображения
@@ -991,6 +1009,77 @@ def activity_quick_reminder_msg(today_count, goal):
 Сегодня выполнено: *{today_count}/{goal}* упражнений.
 
 Напоминаю выполнить ещё одно — это займёт пару минут!"""
+
+
+def user_stats_msg(stats):
+    """Форматирует статистику пользователя"""
+    # Парсим дату регистрации
+    from datetime import datetime
+    try:
+        created_dt = datetime.strptime(stats['created_date'], '%Y-%m-%d %H:%M:%S')
+        created_formatted = created_dt.strftime('%d.%m.%Y')
+    except (ValueError, TypeError):
+        created_formatted = "N/A"
+
+    # Количество дней на платформе
+    try:
+        reg_date = datetime.strptime(stats['created_date'], '%Y-%m-%d %H:%M:%S')
+        days_on_platform = (datetime.now() - reg_date).days
+    except (ValueError, TypeError):
+        days_on_platform = 0
+
+    # Вода
+    water_stats = stats.get('water', {})
+    water_goal = water_stats.get('goal')
+    water_today = water_stats.get('today', 0)
+    water_total = water_stats.get('total', 0)
+
+    if water_goal:
+        water_percent = (water_today / water_goal * 100) if water_goal else 0
+        water_bar = "█" * (water_percent // 10) + "░" * (10 - water_percent // 10)
+        water_section = f"""
+
+💧 *Водный баланс*
+• Цель: {water_goal} мл
+• Сегодня: {water_today} мл ({water_percent}%)
+• {water_bar}
+• Всего этой неделей: {water_total} мл"""
+    else:
+        water_section = """
+
+💧 *Водный баланс*
+• Не настроен (в настройках)"""
+
+    # Активность
+    activity_stats = stats.get('activity', {})
+    activity_goal = activity_stats.get('goal')
+    activity_today = activity_stats.get('today', 0)
+    activity_weekly = activity_stats.get('weekly', 0)
+    if activity_goal:
+        activity_percent = round(activity_today / activity_goal * 100) if activity_goal else 0
+        activity_bar = "█" * (activity_percent // 10) + "░" * (10 - activity_percent // 10)
+        activity_section = f"""
+
+💪 *Физическая активность*
+• Цель: {activity_goal} упражнений
+• сегодня: {activity_today} упражнения ({activity_percent}%)
+• {activity_bar}
+• На этой неделе: {activity_weekly} упражнений"""
+    else:
+        activity_section = """
+
+💪 *Физическая активность*
+• Не настроена (в настройках)"""
+
+    return f"""📊 *Статистика профиля*
+
+👤 *Ник: @{stats['username'] or 'Не установлен'}*
+
+📅 *На платформе: {plural_days(days_on_platform)}*
+
+⏰ *Дата регистрации:* {created_formatted}{water_section}{activity_section}
+
+✨ Продолжай в том же духе!"""
 
 
 exercise_cancel_msg = """❌ Добавление упражнения отменено.

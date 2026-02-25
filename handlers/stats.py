@@ -1,7 +1,7 @@
 import asyncio
 
-from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin
-from messages import adm_stats_msg, owner_stats_msg
+from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin, get_user_full_stats
+from messages import adm_stats_msg, owner_stats_msg, user_stats_msg
 
 
 def case_of_numerals(number):
@@ -28,3 +28,11 @@ async def adm_stats():
 async def owner_stats():
     admins =  await get_all_admin()
     return await asyncio.to_thread(owner_stats_msg, admins)
+
+
+async def user_stats(user_id):
+    """Получает и форматирует статистику пользователя"""
+    stats = await get_user_full_stats(user_id)
+    if not stats:
+        return "Ошибка при загрузке статистики"
+    return user_stats_msg(stats)

@@ -838,3 +838,84 @@ async def get_user_exercise_stats_for_exercise(user_id, exercise_id):
         weekly = (await cursor.fetchone())[0]
 
         return {'total': total, 'weekly': weekly}
+
+
+async def get_user_full_stats(user_id):
+    """Получает полную статистику пользователя для главного меню."""
+    async with get_connection() as conn:
+        # Информация о пользователе
+        cursor = await conn.execute(
+            'SELECT username, status, created_date FROM users WHERE user_id = ?',
+            (user_id,)
+        )
+        user_info = await cursor.fetchone()
+        if not user_info:
+            return None
+        
+        username, status, created_date = user_info
+        
+        # Статистика по воде
+        cursor = await conn.execute(
+            'SELECT goal_ml FROM track_water WHERE user_id = ?',
+            (user_id,)
+        )
+        water_goal_row = await cursor.fetchone()
+        water_goal = int(water_goal_row[0]) if water_goal_row and water_goal_row[0] else None
+        
+        # Текущее количество выпитой воды за сегодня
+        today = await get_user_time_now(user_id)
+        day_name = today.strftime('%A')
+        cursor = await conn.execute(
+            f'SELECT {day_name} FROM track_water WHERE user_id = ?',
+            (user_id,)
+        )
+        water_today_row = await cursor.fetchone()
+        water_today = int(water_today_row[0]) if water_today_row and water_today_row[0] else 0
+        
+        # Вода за неделю
+        cursor = await conn.execute(
+            '''SELECT COALESCE(SUM(amount), 0) FROM water_logs 
+               WHERE user_id = ? AND date(added_at) >= date('now', '-7 days')''',
+            (user_id,)
+        )
+        water_total = (await cursor.fetchone())[0]
+        
+        # Статистика по активности
+        cursor = await conn.execute(
+            'SELECT goal_exercises FROM track_activity WHERE user_id = ?',
+            (user_id,)
+        )
+        activity_goal_row = await cursor.fetchone()
+        activity_goal = activity_goal_row[0] if activity_goal_row and activity_goal_row[0] else None
+        
+        # Упражнения выполненные сегодня
+        user_time = await get_user_time_now(user_id)
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM exercises_logs WHERE user_id = ? AND date = ?''',
+            (user_id, user_time.strftime('%Y-%m-%d'))
+        )
+        activity_today = (await cursor.fetchone())[0]
+        
+        # Упражнения за неделю
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM exercises_logs 
+               WHERE user_id = ? AND date >= DATE('now', '-7 days')''',
+            (user_id,)
+        )
+        activity_weekly = (await cursor.fetchone())[0]
+        
+        return {
+            'username': username,
+            'status': status,
+            'created_date': created_date,
+            'water': {
+                'goal': water_goal,
+                'today': water_today,
+                'total': water_total
+            },
+            'activity': {
+                'goal': activity_goal,
+                'today': activity_today,
+                'weekly': activity_weekly
+            }
+        }

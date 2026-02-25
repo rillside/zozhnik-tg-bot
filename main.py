@@ -29,7 +29,7 @@ from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_ca
     timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
     technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
     admin_ticket_section_keyboard, water_goal_not_set_keyboard, admin_exercise_keyboard, \
-     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard
+     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard, cancel_any_keyboard
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
     activity_setup_required_msg, activity_goal_selection_msg, activity_tracker_setup_msg, \
     add_new_adm_msg, remove_adm_msg, \
@@ -43,7 +43,7 @@ from handlers.settings import set_reminder_type_water, water_smart_type_install,
     activity_reminder_open, activity_smart_type_install, activity_interval_open, activity_setting_interval, \
     activity_goal_settings, activity_goal_custom_stg, activity_stg_cancel
 from handlers.sleeps import sleeps_main
-from handlers.stats import adm_stats, owner_stats
+from handlers.stats import adm_stats, owner_stats, user_stats
 from config import token, is_admin, is_owner
 from utils.fsm import user_states, get_state, set_state, clear_state
 bot = AsyncTeleBot(token, parse_mode="Markdown")
@@ -210,7 +210,12 @@ async def msg(message):
             await bot.send_message(message.chat.id, sleeps_main())
 
         case "📊 Статистика":
-            await bot.send_message(message.chat.id, "тут будет статистика")
+            stats_text = await user_stats(message.chat.id)
+            await bot.send_message(
+                message.chat.id,
+                stats_text,
+                reply_markup=cancel_any_keyboard()
+            )
 
         case "⚙️ Настройки":
             await bot.send_message(
