@@ -18,8 +18,9 @@ async def _send_with_semaphore(semaphore, coro):
             await coro
             return True
         except Exception as e:
-            _logger.warning("Ошибка отправки: %s", e)
-            return False
+            _logger.warning(f"Ошибка отправки для {coro.__name__}: {e}")
+            import traceback
+            _logger.warning(traceback.format_exc())
 
 
 async def rate_limited_gather(send_coroutines):
