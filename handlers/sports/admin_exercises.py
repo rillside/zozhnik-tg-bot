@@ -1,22 +1,70 @@
 import asyncio
-from database import add_exercise_to_db, is_exercise_name_exists, get_exercises_id_name, get_exercise_by_id, \
-    get_file_id_by_ex_id, update_exercise_in_db, get_exercise_status, delete_exercise_in_db, get_exercise_stats
-from keyboards import admin_exercise_keyboard, exercise_navigation_keyboard, ex_difficulty_keyboard, \
-    ex_category_keyboard, \
-    exercise_confirm_keyboard, cancel_media_keyboard, exercise_category_filter_keyboard, \
-    exercise_difficulty_filter_keyboard, edit_ex_pagination_keyboard, no_exercises_keyboard, exercise_edit_keyboard, \
-    exercise_edit_cancel_keyboard, ex_confirm_delete_keyboard, cancel_any_keyboard
-from messages import admin_exercise_menu_msg, exercise_request_name_msg, exercise_name_too_long_msg, \
-    exercise_request_description_msg, exercise_description_too_short_msg, exercise_description_too_long_msg, \
-    exercise_request_category_msg, exercise_request_difficulty_msg, exercise_request_video_msg, \
-    error_msg, exercise_name_exists, exercise_saved_msg, exercise_confirm_msg, exercise_add_error, step_back_msg, \
-    aggressive_exercise_info_msg, edit_exercise_category_msg, edit_exercise_difficulty_msg, \
-    no_exercises_found_msg, exercises_list_header_msg, exercise_full_details_msg, edit_exercise_field_name_msg, \
-    edit_exercise_field_description_msg, edit_exercise_field_category_msg, edit_exercise_field_difficulty_msg, \
-    edit_exercise_field_video_msg, exercise_edit_error_msg, confirm_delete_exercise_msg, exercise_deleted_msg, \
-    cancellation, exercise_stats_msg
+
+from database import (
+    add_exercise_to_db,
+    delete_exercise_in_db,
+    get_exercise_by_id,
+    get_exercise_media_info,
+    get_exercise_stats,
+    get_exercise_status,
+    get_exercises_id_name,
+    get_file_id_by_ex_id,
+    is_exercise_name_exists,
+    update_exercise_file_id,
+    update_exercise_in_db,
+)
+from keyboards import (
+    admin_exercise_keyboard,
+    cancel_any_keyboard,
+    cancel_media_keyboard,
+    edit_ex_pagination_keyboard,
+    ex_category_keyboard,
+    ex_confirm_delete_keyboard,
+    ex_difficulty_keyboard,
+    exercise_category_filter_keyboard,
+    exercise_confirm_keyboard,
+    exercise_difficulty_filter_keyboard,
+    exercise_edit_cancel_keyboard,
+    exercise_edit_keyboard,
+    exercise_navigation_keyboard,
+    no_exercises_keyboard,
+)
+from messages import (
+    admin_exercise_menu_msg,
+    aggressive_exercise_info_msg,
+    cancellation,
+    confirm_delete_exercise_msg,
+    edit_exercise_category_msg,
+    edit_exercise_difficulty_msg,
+    edit_exercise_field_category_msg,
+    edit_exercise_field_description_msg,
+    edit_exercise_field_difficulty_msg,
+    edit_exercise_field_name_msg,
+    edit_exercise_field_video_msg,
+    error_msg,
+    exercise_add_error,
+    exercise_confirm_msg,
+    exercise_deleted_msg,
+    exercise_description_too_long_msg,
+    exercise_description_too_short_msg,
+    exercise_edit_error_msg,
+    exercise_full_details_msg,
+    exercise_name_exists,
+    exercise_name_too_long_msg,
+    exercise_request_category_msg,
+    exercise_request_description_msg,
+    exercise_request_difficulty_msg,
+    exercise_request_name_msg,
+    exercise_request_video_msg,
+    exercise_saved_msg,
+    exercise_stats_msg,
+    exercises_list_header_msg,
+    no_exercises_found_msg,
+    step_back_msg,
+)
 from utils.censorship.checker import censor_check, removal_of_admin_rights
-from utils.fsm import set_state, get_state, clear_state_keep_data, clear_state
+from utils.fsm import clear_state, clear_state_keep_data, get_state, set_state
+from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
 def get_validated_data(user_id):
@@ -31,11 +79,12 @@ def get_validated_data(user_id):
         category = data.get('category')
         difficulty = data.get('difficulty')
         file_id = data.get('video')
+        video_type = data.get('video_type', 'video')
     else:
         return False
     if not all([name, description, category, difficulty]):
         return False
-    return name, description, category, difficulty, file_id
+    return name, description, category, difficulty, file_id, video_type
 
 
 async def validate_exercise_censorship(name, description):
@@ -65,7 +114,7 @@ async def exercise_management(message, bot, first_name=None):
 async def handle_exercise_accept(user_id, bot):
     res = get_validated_data(user_id)
     if res:
-        name, description, category, difficulty, file_id = get_validated_data(user_id)
+        name, description, category, difficulty, file_id, _video_type = res
     else:
         await bot.send_message(user_id, exercise_add_error)
         return False
@@ -87,9 +136,17 @@ async def handle_exercise_accept(user_id, bot):
 async def save_exercise(user_id, username, bot):
     res = get_validated_data(user_id)
     if res:
-        name, description, category, difficulty, file_id = get_validated_data(user_id)
+        name, description, category, difficulty, file_id, video_type = get_validated_data(user_id)
         if await validate_exercise_censorship(name, description):
-            await add_exercise_to_db(name, description, category, difficulty, file_id, user_id)
+            # Если есть видео, сохраняем его в канал
+            channel_message_id = None
+            if file_id:
+                channel_message_id, new_file_id = await save_media_to_channel(bot, file_id, video_type)
+                # Используем новый file_id из канала, если сохранение прошло успешно
+                if channel_message_id and new_file_id:
+                    file_id = new_file_id
+
+            await add_exercise_to_db(name, description, category, difficulty, file_id, user_id, channel_message_id)
             await bot.send_message(user_id, exercise_saved_msg(name),
                                    reply_markup=admin_exercise_keyboard())
         else:
@@ -251,6 +308,7 @@ async def handle_exercise_video(message, bot):
     state, data = get_state(message.chat.id)
     file_id = message.video.file_id if message.video else message.animation.file_id
     data['video'] = file_id
+    data['video_type'] = 'video' if message.video else 'animation'
     clear_state_keep_data(message.chat.id)
     await handle_exercise_accept(message.chat.id, bot)
 
@@ -276,21 +334,49 @@ async def open_video(call, bot, is_moment_of_creation=True):
     if is_moment_of_creation:
         res = get_validated_data(call.message.chat.id)
         if res:
-            file_id = res[-1]
+            file_id = res[-2]
+            video_type = res[-1]
+            channel_message_id = None
         else:
             await bot.send_message(call.message.chat.id, exercise_add_error)
             return
     else:
         exercise_id = call.data.split('_')[-1]
-        file_id = await get_file_id_by_ex_id(exercise_id)
+        file_id, channel_message_id = await get_exercise_media_info(exercise_id)
+        video_type = 'video'
+
     if not file_id:
         await bot.answer_callback_query(call.id, 'Видео не прикреплено', show_alert=True)
         return
-    await bot.send_video(
-        chat_id=call.message.chat.id,
-        video=file_id,
-        reply_markup=cancel_media_keyboard()
-    )
+
+    # Используем fallback механизм только для существующих упражнений
+    if not is_moment_of_creation and channel_message_id:
+        async def update_callback(new_file_id):
+            await update_exercise_file_id(exercise_id, new_file_id)
+
+        await send_media_with_fallback(
+            bot=bot,
+            chat_id=call.message.chat.id,
+            file_id=file_id,
+            channel_message_id=channel_message_id,
+            media_type=video_type,
+            reply_markup=cancel_media_keyboard(),
+            update_callback=update_callback
+        )
+    else:
+        # Для новых упражнений просто отправляем без fallback
+        if video_type == 'animation':
+            await bot.send_animation(
+                chat_id=call.message.chat.id,
+                animation=file_id,
+                reply_markup=cancel_media_keyboard()
+            )
+        else:
+            await bot.send_video(
+                chat_id=call.message.chat.id,
+                video=file_id,
+                reply_markup=cancel_media_keyboard()
+            )
 
 
 async def edit_exercise_start(call, bot):
@@ -378,8 +464,8 @@ async def open_exercise_for_edit(bot, call=None, ex_id=None, message=None):
     old_category, old_difficulty = data['category'], data['difficulty']
     exercise_id = ex_id or int(call.data.split('_')[-1])
     exercise_info = await get_exercise_by_id(exercise_id)
-    (ex_id, name, description, category, difficulty, file_id, created_by,
-     created_at, updated_at, is_active) = exercise_info
+    (ex_id, name, description, category, difficulty, file_id, channel_message_id,
+     created_by, created_at, updated_at, is_active) = exercise_info
     try:
             await bot.delete_message(user_id, message_id)
     except:
@@ -494,6 +580,14 @@ async def save_exercise_changes(bot, message=None, call=None):
         new_field = call.data.split('_')[-1]
     elif action == 'videochange':
         new_field = message.video.file_id if message.video else message.animation.file_id
+        new_media_type = 'video' if message.video else 'animation'
+        # Сохраняем новое видео в канал
+        channel_message_id, new_file_id = await save_media_to_channel(bot, new_field, new_media_type)
+        # Используем новый file_id из канала, если сохранение прошло успешно
+        if channel_message_id and new_file_id:
+            new_field = new_file_id
+            # Обновляем channel_message_id
+            await update_exercise_in_db(ex_id, 'channel_message_id', channel_message_id)
     else:
         return
     field_mapping = {

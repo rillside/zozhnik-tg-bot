@@ -1,19 +1,54 @@
 import asyncio
 from datetime import datetime, timedelta
 
+from database import (
+    add_ticket,
+    count_tickets_for_admin,
+    delete_ticket,
+    get_message_media_info,
+    get_photo_file_id,
+    get_photo_ids_by_ticket,
+    get_ticket_status,
+    load_info_by_ticket,
+    load_tickets_info,
+    replace_ticket_status,
+    send_supp_msg,
+    tickets_by_user,
+    update_message_file_id,
+)
+from handlers.admin_notifications import new_message_in_ticket_notify, new_ticket_notify
+from keyboards import (
+    accept_aggressive_msg_keyboard,
+    accept_aggressive_title_keyboard,
+    accept_delete_ticket_keyboard,
+    admin_ticket_section_keyboard,
+    cancel_media_keyboard,
+    go_to_ticket_keyboard,
+    opening_ticket_keyboard,
+    supp_ticket_draft_keyboard,
+    support_selection_keyboard,
+    ticket_actions_keyboard,
+)
+from messages import (
+    admin_open_ticket_msg,
+    admin_ticket_section_msg,
+    admin_tickets_msg,
+    aggressive_content_warning_msg,
+    cancellation,
+    confirm_delete_ticket_msg,
+    error_ticket_opening_msg,
+    my_tickets_msg,
+    no_active_tickets_msg,
+    notify_new_message_in_ticket,
+    open_ticket_msg,
+    succ_ticket_title_msg,
+    support_selection_msg,
+    ticket_closed_msg,
+    ticket_limit_error_msg,
+)
 from utils.censorship.checker import censor_check, removal_of_admin_rights
-from database import add_ticket, load_info_by_ticket, get_ticket_status, replace_ticket_status, send_supp_msg, \
-    delete_ticket, tickets_by_user, load_tickets_info, count_tickets_for_admin, \
-    get_photo_ids_by_ticket, get_photo_file_id
-from handlers.admin_notifications import new_ticket_notify, new_message_in_ticket_notify
-from keyboards import supp_ticket_draft_keyboard, ticket_actions_keyboard, go_to_ticket_keyboard, \
-    accept_aggressive_msg_keyboard, accept_aggressive_title_keyboard, accept_delete_ticket_keyboard, \
-    opening_ticket_keyboard, support_selection_keyboard, admin_ticket_section_keyboard, cancel_media_keyboard
-from messages import aggressive_content_warning_msg, succ_ticket_title_msg, open_ticket_msg, \
-    admin_open_ticket_msg, ticket_limit_error_msg, notify_new_message_in_ticket, \
-    error_ticket_opening_msg, ticket_closed_msg, confirm_delete_ticket_msg, cancellation, my_tickets_msg, \
-    no_active_tickets_msg, admin_tickets_msg, support_selection_msg, admin_ticket_section_msg
 from utils.fsm import clear_state, set_state
+from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
 async def opening_ticket(message, bot, id_ticket, role):
@@ -64,8 +99,24 @@ async def opening_ticket(message, bot, id_ticket, role):
     set_state(message.chat.id, 'waiting_send_msg_to_ticket', [id_ticket, role, last_msg, type_ticket, user_id])
 
 async def opening_photo_in_ticket(call, bot, msg_id):
-    file_id = await get_photo_file_id(msg_id)
-    await bot.send_photo(call.message.chat.id,file_id,reply_markup=cancel_media_keyboard())
+    file_id, channel_message_id = await get_message_media_info(msg_id)
+    if not file_id:
+        await bot.answer_callback_query(call.id, 'Фото не найдено', show_alert=True)
+        return
+
+    # Используем fallback механизм
+    async def update_callback(new_file_id):
+        await update_message_file_id(msg_id, new_file_id)
+
+    await send_media_with_fallback(
+        bot=bot,
+        chat_id=call.message.chat.id,
+        file_id=file_id,
+        channel_message_id=channel_message_id,
+        media_type='photo',
+        reply_markup=cancel_media_keyboard(),
+        update_callback=update_callback if channel_message_id else None
+    )
 async def handle_delete_ticket(call, bot, type_handle):
     await bot.delete_message(call.message.chat.id, call.message_id)
     if type_handle == 'delete':
@@ -147,8 +198,16 @@ async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_t
         text = caption if caption else ''
     if len(text) <= 1000:
         if await censor_check(text):
+            # Если это фото, сохраняем его в канал
+            channel_message_id = None
+            if type_msg == 'photo' and file_id:
+                channel_message_id, new_file_id = await save_media_to_channel(bot, file_id, 'photo')
+                # Используем новый file_id из канала, если сохранение прошло успешно
+                if channel_message_id and new_file_id:
+                    file_id = new_file_id
+
             is_from_user = 1 if role == 'user' else 0
-            await send_supp_msg(ticket_id, text, is_from_user,type_msg,file_id)
+            await send_supp_msg(ticket_id, text, is_from_user, type_msg, file_id, channel_message_id)
             info = await load_info_by_ticket(ticket_id)
             last_update = info[0][-1]
             server_time = datetime.fromisoformat(last_update) + timedelta(hours=3)

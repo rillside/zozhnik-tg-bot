@@ -46,7 +46,7 @@ from handlers.sleeps import sleeps_main
 from handlers.stats import adm_stats, owner_stats, user_stats
 from config import token, is_admin, is_owner
 from utils.fsm import user_states, get_state, set_state, clear_state
-bot = AsyncTeleBot(token, parse_mode="Markdown")
+bot = AsyncTeleBot(token, parse_mode='Markdown')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -576,7 +576,7 @@ async def callback_inline(call):
                      or data.startswith('sport_ex_all_page_') \
                      or data.startswith('sports_back_to_list_'):
             await sports_show_list(call, bot)
-        case data if data.startswith('sports_open_ex'):
+        case data if data.startswith('sports_open_ex_'):
             await sports_show_exercise(call, bot)
         case data if data.startswith('sports_fav_'):
             await toggle_favorite(call, bot)

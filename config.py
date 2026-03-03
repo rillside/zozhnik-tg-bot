@@ -1,7 +1,10 @@
 import json
-from database import get_user_status
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
+
+from database import get_user_status
+
 
 def load_owners():
     try:
@@ -17,9 +20,20 @@ load_dotenv()
 token = os.getenv('token_bot')  # Токен бота
 if not token:
     raise ValueError("BOT_TOKEN не найден в .env файле!")
+
+# Канал для хранения медиафайлов (фото/видео)
+# Бот должен быть админом в этом канале
+media_storage_channel_id = os.getenv('MEDIA_STORAGE_CHANNEL_ID')
+if not media_storage_channel_id:
+    raise ValueError("MEDIA_STORAGE_CHANNEL_ID не найден в .env файле! Укажите ID канала для хранения медиа.")
+try:
+    media_storage_channel_id = int(media_storage_channel_id)
+except ValueError:
+    raise ValueError("MEDIA_STORAGE_CHANNEL_ID должен быть числом!")
+
 owners = load_owners()
 owners_copy = owners[:]
-ai_censor_enabled = False
+ai_censor_enabled = True
 censorship_threshold = 0.5 #Порог срабатывания AI цензуры
 
 def save_owners():
