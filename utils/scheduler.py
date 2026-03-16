@@ -6,8 +6,13 @@ from database import (
     set_last_reset_water, get_lost_records_of_water, water_reset, add_water_ml, delete_water_log,
     get_users_for_activity_reminders, get_activity_goal_and_today_count, update_activity_reminder_sent_time,
     get_last_exercise_log, get_inactive_users_for_reminder, update_last_inactivity_reminder,
+    get_users_for_sleep_reminders, update_sleep_last_sleep_reminder, update_sleep_last_wake_reminder,
+    get_all_sleep_settings_for_quiet_hours,
 )
-from messages import water_quick_reminder_msg, activity_quick_reminder_msg, activity_inactive_reminder_msg
+from messages import (
+    water_quick_reminder_msg, activity_quick_reminder_msg, activity_inactive_reminder_msg,
+    sleep_reminder_before_msg, sleep_reminder_wakeup_msg,
+)
 from utils.rate_limit_send import rate_limited_gather
 
 _logger = logging.getLogger(__name__)
@@ -48,17 +53,38 @@ class Scheduler:
                 await asyncio.sleep(60)
 
     async def _check_all_reminders(self):
-        await self._check_water_reminders()
-        await self._check_activity_reminders()
-        await self._check_inactive_users_reminders()
+        quiet_hours = await get_all_sleep_settings_for_quiet_hours()
+        await self._check_water_reminders(quiet_hours)
+        await self._check_activity_reminders(quiet_hours)
+        await self._check_inactive_users_reminders(quiet_hours)
+        await self._check_sleep_reminders()
         await self._check_weekly_water_reset()
 
-    async def _check_water_reminders(self):
+    @staticmethod
+    def _is_quiet_hours(user_id, quiet_hours):
+        """Возвращает True, если текущее время пользователя попадает в окно сна."""
+        if user_id not in quiet_hours:
+            return False
+        sleep_time_str, wake_time_str, tz = quiet_hours[user_id]
+        now_user = datetime.now() + timedelta(hours=tz)
+        now_min = now_user.hour * 60 + now_user.minute
+        sleep_h, sleep_m = map(int, sleep_time_str.split(':'))
+        wake_h, wake_m = map(int, wake_time_str.split(':'))
+        sleep_min = sleep_h * 60 + sleep_m
+        wake_min = wake_h * 60 + wake_m
+        if sleep_min > wake_min:  # переходит через полночь (напр. 23:00 → 07:00)
+            return now_min >= sleep_min or now_min < wake_min
+        else:
+            return sleep_min <= now_min < wake_min
+
+    async def _check_water_reminders(self, quiet_hours=None):
         users = await get_users_for_water_reminders()
         now_time_utc = datetime.now() - timedelta(hours=3)
         to_remind = []
         for user_id, broadcast_type, broadcast_interval, last_broadcast, last_update in users:
             if broadcast_type is None:
+                continue
+            if quiet_hours and self._is_quiet_hours(user_id, quiet_hours):
                 continue
             last_update_dt = datetime.fromisoformat(last_update) if last_update else None
             last_broadcast_dt = datetime.fromisoformat(last_broadcast) if last_broadcast else None
@@ -85,12 +111,14 @@ class Scheduler:
         except Exception as e:
             _logger.error(f" Ошибка отправки напоминания user_id={user_id}: {e}")
 
-    async def _check_activity_reminders(self):
+    async def _check_activity_reminders(self, quiet_hours=None):
         users = await get_users_for_activity_reminders()
         now_utc = datetime.utcnow()
         to_remind = []
         for row in users:
             user_id, broadcast_type, broadcast_interval, last_broadcast = row[:4]
+            if quiet_hours and self._is_quiet_hours(user_id, quiet_hours):
+                continue
             last_broadcast_dt = datetime.fromisoformat(last_broadcast[:19]) if last_broadcast else None
             if last_broadcast_dt is None:
                 continue
@@ -124,8 +152,12 @@ class Scheduler:
         except Exception as e:
             _logger.error(f"Ошибка отправки напоминания активности user_id={user_id}: {e}")
 
-    async def _check_inactive_users_reminders(self):
+    async def _check_inactive_users_reminders(self, quiet_hours=None):
         user_ids = await get_inactive_users_for_reminder()
+        if not user_ids:
+            return
+        if quiet_hours:
+            user_ids = [uid for uid in user_ids if not self._is_quiet_hours(uid, quiet_hours)]
         if not user_ids:
             return
         coros = [self._send_inactive_reminder(uid) for uid in user_ids]
@@ -138,6 +170,52 @@ class Scheduler:
             _logger.info(f"Отправлено напоминание неактивному user_id={user_id}")
         except Exception as e:
             _logger.error(f"Ошибка напоминания неактивному user_id={user_id}: {e}")
+
+    async def _check_sleep_reminders(self):
+        users = await get_users_for_sleep_reminders()
+        for user_id, sleep_time_str, wake_time_str, tz, last_sleep_rem, last_wake_rem in users:
+            tz = tz or 0
+            now_user = datetime.now() + timedelta(hours=tz)
+            now_min = now_user.hour * 60 + now_user.minute
+
+            sleep_h, sleep_m = map(int, sleep_time_str.split(':'))
+            wake_h, wake_m = map(int, wake_time_str.split(':'))
+            sleep_min = sleep_h * 60 + sleep_m
+            wake_min = wake_h * 60 + wake_m
+
+            # Окно напоминания "пора спать": за [35, 5] мин до отбоя
+            sleep_window_start = (sleep_min - 35) % 1440
+            sleep_window_end = (sleep_min - 5) % 1440
+
+            def _in_window(now_m, start_m, end_m):
+                if start_m <= end_m:
+                    return start_m <= now_m <= end_m
+                else:  # перехлёст через полночь
+                    return now_m >= start_m or now_m <= end_m
+
+            # Напоминание о сне
+            if _in_window(now_min, sleep_window_start, sleep_window_end):
+                last_dt = datetime.fromisoformat(last_sleep_rem[:19]) if last_sleep_rem else None
+                if last_dt is None or (now_user - last_dt).total_seconds() > 20 * 3600:
+                    try:
+                        await self.bot.send_message(user_id, sleep_reminder_before_msg(sleep_time_str))
+                        await update_sleep_last_sleep_reminder(user_id)
+                        _logger.info(f"Sleep reminder sent to user_id={user_id}")
+                    except Exception as e:
+                        _logger.error(f"Sleep reminder error user_id={user_id}: {e}")
+
+            # Окно напоминания "доброе утро": [wake_time - 5, wake_time + 5]
+            wake_window_start = (wake_min - 5) % 1440
+            wake_window_end = (wake_min + 5) % 1440
+            if _in_window(now_min, wake_window_start, wake_window_end):
+                last_dt = datetime.fromisoformat(last_wake_rem[:19]) if last_wake_rem else None
+                if last_dt is None or (now_user - last_dt).total_seconds() > 20 * 3600:
+                    try:
+                        await self.bot.send_message(user_id, sleep_reminder_wakeup_msg(wake_time_str))
+                        await update_sleep_last_wake_reminder(user_id)
+                        _logger.info(f"Wake reminder sent to user_id={user_id}")
+                    except Exception as e:
+                        _logger.error(f"Wake reminder error user_id={user_id}: {e}")
 
     @staticmethod
     async def _check_weekly_water_reset():

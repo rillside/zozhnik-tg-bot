@@ -1,11 +1,13 @@
 from config import is_admin
 from database import count_users_trackers, update_activity_goal, \
     activity_set_reminder_type, water_set_reminder_type, get_timezone, \
-    set_timezone, update_water_goal
+    set_timezone, update_water_goal, \
+    get_sleep_settings, update_sleep_time, update_wake_time, toggle_sleep_reminders
 from keyboards import activity_setup_keyboard, activity_goal_keyboard, \
     activity_goal_custom_cancel, activity_reminder_type_keyboard, \
     activity_interval_keyboard, settings_keyboard, water_goal_keyboard, \
-    water_setup_keyboard, get_water_reminder_type_keyboard, main_menu, water_goal_custom_cancel
+    water_setup_keyboard, get_water_reminder_type_keyboard, main_menu, water_goal_custom_cancel, \
+    sleep_setup_keyboard, sleep_time_keyboard, wake_time_keyboard, sleep_cancel_custom_keyboard
 from messages import activity_tracker_setup_msg, activity_goal_selection_msg, \
     activity_setup_required_msg, activity_goal_success_msg, \
     activity_reminder_type_selection_msg, activity_interval_setup_msg, \
@@ -16,7 +18,10 @@ from messages import activity_tracker_setup_msg, activity_goal_selection_msg, \
     water_goal_incorrect_format_msg, water_reminder_type_selection_msg, \
     water_setup_required_msg, water_reminder_type_smart_msg, \
     water_interval_selected_short_msg, water_goal_custom_msg, cancellation, \
-    timezone_suc_msg, start_message, settings_msg
+    timezone_suc_msg, start_message, settings_msg, \
+    sleep_tracker_setup_msg, sleep_time_selection_msg, wake_time_selection_msg, \
+    sleep_time_set_msg, wake_time_set_msg, sleep_time_format_error_msg, \
+    sleep_reminder_toggle_msg, sleep_custom_time_input_msg
 from utils.fsm import clear_state, set_state
 
 
@@ -290,3 +295,192 @@ async def activity_stg_cancel(call, bot):
         settings_msg(call.from_user.first_name),
         reply_markup=settings_keyboard()
     )
+
+
+# ─────────────────────────────── SLEEP SETTINGS ────────────────────────────────
+
+def _parse_time(text):
+    """Валидирует и возвращает время HH:MM или None."""
+    text = text.strip()
+    parts = text.split(':')
+    if len(parts) != 2:
+        return None
+    try:
+        h, m = int(parts[0]), int(parts[1])
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return f"{h:02d}:{m:02d}"
+    except ValueError:
+        pass
+    return None
+
+
+async def sleep_settings_open(call, bot):
+    """Открывает настройки трекера сна."""
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    settings = await get_sleep_settings(call.message.chat.id)
+    sleep_time = settings[0] if settings else None
+    wake_time = settings[1] if settings else None
+    reminders_enabled = bool(settings[2]) if settings else True
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_tracker_setup_msg(call.from_user.first_name, sleep_time, wake_time, reminders_enabled),
+        reply_markup=sleep_setup_keyboard(reminders_enabled)
+    )
+
+
+async def sleep_stg_sleep_time_open(call, bot):
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_time_selection_msg(call.from_user.first_name),
+        reply_markup=sleep_time_keyboard()
+    )
+
+
+async def sleep_stg_wake_time_open(call, bot):
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    await bot.send_message(
+        call.message.chat.id,
+        wake_time_selection_msg(call.from_user.first_name),
+        reply_markup=wake_time_keyboard()
+    )
+
+
+async def sleep_select_sleep_time(call, bot):
+    """Обрабатывает выбор времени отбоя из кнопок или кастомный ввод."""
+    time_str = call.data.replace('select_sleep_time_', '')
+    await update_sleep_time(call.message.chat.id, time_str)
+    await bot.answer_callback_query(call.id, sleep_time_set_msg(time_str), show_alert=False)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    settings = await get_sleep_settings(call.message.chat.id)
+    reminders_enabled = bool(settings[2]) if settings else True
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_tracker_setup_msg(call.from_user.first_name, time_str,
+                                settings[1] if settings else None, reminders_enabled),
+        reply_markup=sleep_setup_keyboard(reminders_enabled)
+    )
+
+
+async def sleep_select_wake_time(call, bot):
+    """Обрабатывает выбор времени подъёма из кнопок."""
+    time_str = call.data.replace('select_wake_time_', '')
+    await update_wake_time(call.message.chat.id, time_str)
+    await bot.answer_callback_query(call.id, wake_time_set_msg(time_str), show_alert=False)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    settings = await get_sleep_settings(call.message.chat.id)
+    reminders_enabled = bool(settings[2]) if settings else True
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_tracker_setup_msg(call.from_user.first_name,
+                                settings[0] if settings else None, time_str, reminders_enabled),
+        reply_markup=sleep_setup_keyboard(reminders_enabled)
+    )
+
+
+async def sleep_request_custom_sleep_time(call, bot):
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    send_msg = await bot.send_message(
+        call.message.chat.id, sleep_custom_time_input_msg,
+        reply_markup=sleep_cancel_custom_keyboard()
+    )
+    set_state(call.message.chat.id, 'waiting_custom_sleep_time', [call, send_msg])
+
+
+async def sleep_request_custom_wake_time(call, bot):
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    send_msg = await bot.send_message(
+        call.message.chat.id, sleep_custom_time_input_msg,
+        reply_markup=sleep_cancel_custom_keyboard()
+    )
+    set_state(call.message.chat.id, 'waiting_custom_wake_time', [call, send_msg])
+
+
+async def sleep_custom_sleep_time_input(bot, message, call, send_msg):
+    """Обрабатывает кастомный ввод времени отбоя."""
+    time_str = _parse_time(message.text)
+    if time_str:
+        clear_state(message.chat.id)
+        await update_sleep_time(message.chat.id, time_str)
+        await bot.delete_message(message.chat.id, send_msg.message_id)
+        settings = await get_sleep_settings(message.chat.id)
+        reminders_enabled = bool(settings[2]) if settings else True
+        await bot.send_message(message.chat.id, sleep_time_set_msg(time_str))
+        await bot.send_message(
+            message.chat.id,
+            sleep_tracker_setup_msg(call.from_user.first_name, time_str,
+                                    settings[1] if settings else None, reminders_enabled),
+            reply_markup=sleep_setup_keyboard(reminders_enabled)
+        )
+    else:
+        await bot.delete_message(message.chat.id, send_msg.message_id)
+        send_msg = await bot.send_message(
+            message.chat.id, sleep_time_format_error_msg,
+            reply_markup=sleep_cancel_custom_keyboard()
+        )
+        set_state(message.chat.id, 'waiting_custom_sleep_time', [call, send_msg])
+
+
+async def sleep_custom_wake_time_input(bot, message, call, send_msg):
+    """Обрабатывает кастомный ввод времени подъёма."""
+    time_str = _parse_time(message.text)
+    if time_str:
+        clear_state(message.chat.id)
+        await update_wake_time(message.chat.id, time_str)
+        await bot.delete_message(message.chat.id, send_msg.message_id)
+        settings = await get_sleep_settings(message.chat.id)
+        reminders_enabled = bool(settings[2]) if settings else True
+        await bot.send_message(message.chat.id, wake_time_set_msg(time_str))
+        await bot.send_message(
+            message.chat.id,
+            sleep_tracker_setup_msg(call.from_user.first_name,
+                                    settings[0] if settings else None, time_str, reminders_enabled),
+            reply_markup=sleep_setup_keyboard(reminders_enabled)
+        )
+    else:
+        await bot.delete_message(message.chat.id, send_msg.message_id)
+        send_msg = await bot.send_message(
+            message.chat.id, sleep_time_format_error_msg,
+            reply_markup=sleep_cancel_custom_keyboard()
+        )
+        set_state(message.chat.id, 'waiting_custom_wake_time', [call, send_msg])
+
+
+async def sleep_toggle_reminder(call, bot):
+    enabled = await toggle_sleep_reminders(call.message.chat.id)
+    await bot.answer_callback_query(call.id, sleep_reminder_toggle_msg(enabled), show_alert=False)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    settings = await get_sleep_settings(call.message.chat.id)
+    sleep_time = settings[0] if settings else None
+    wake_time = settings[1] if settings else None
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_tracker_setup_msg(call.from_user.first_name, sleep_time, wake_time, enabled),
+        reply_markup=sleep_setup_keyboard(enabled)
+    )
+
+
+async def sleep_stg_cancel(call, bot):
+    await bot.answer_callback_query(call.id, cancellation, show_alert=False)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    await bot.send_message(
+        call.message.chat.id,
+        settings_msg(call.from_user.first_name),
+        reply_markup=settings_keyboard()
+    )
+
+
+async def sleep_custom_time_cancel(call, bot):
+    clear_state(call.message.chat.id)
+    await bot.answer_callback_query(call.id, cancellation, show_alert=False)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
+    settings = await get_sleep_settings(call.message.chat.id)
+    sleep_time = settings[0] if settings else None
+    wake_time = settings[1] if settings else None
+    reminders_enabled = bool(settings[2]) if settings else True
+    await bot.send_message(
+        call.message.chat.id,
+        sleep_tracker_setup_msg(call.from_user.first_name, sleep_time, wake_time, reminders_enabled),
+        reply_markup=sleep_setup_keyboard(reminders_enabled)
+    )
+

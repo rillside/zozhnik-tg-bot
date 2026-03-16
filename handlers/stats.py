@@ -1,7 +1,7 @@
 import asyncio
 
 from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin, get_user_full_stats
-from messages import adm_stats_msg, owner_stats_msg, user_stats_msg
+from messages import adm_stats_msg, owner_stats_msg, user_stats_msg, user_nf
 
 
 def case_of_numerals(number):
@@ -15,14 +15,18 @@ def case_of_numerals(number):
 async def adm_stats():
     cnt_users = len(await all_users())
     active_cnt_users = await get_active_users_count()
-    active_cnt_users_percent = round(active_cnt_users / cnt_users * 100)
+    active_cnt_users_percent = round(active_cnt_users / cnt_users * 100) if cnt_users else 0
     active_cnt_users = case_of_numerals(active_cnt_users)
-    cnt_users = case_of_numerals(cnt_users)
-    new_user_to_week = get_new_users_count(7)
-    new_user_to_day = get_new_users_count(1)
-    water_track_cnt = case_of_numerals(await count_users_trackers('track_water','goal_ml'))
+    cnt_users_str = case_of_numerals(cnt_users)
+    new_user_to_week = await get_new_users_count(7)
+    new_user_to_day = await get_new_users_count(1)
+    water_track_cnt = case_of_numerals(await count_users_trackers('track_water', 'goal_ml'))
+    activity_track_cnt = case_of_numerals(await count_users_trackers('track_activity', 'goal_exercises'))
+    sleep_track_cnt = case_of_numerals(await count_users_trackers('track_sleep', 'sleep_time'))
 
-    return adm_stats_msg(cnt_users, active_cnt_users,active_cnt_users_percent, new_user_to_week, new_user_to_day,water_track_cnt)
+    return adm_stats_msg(cnt_users_str, active_cnt_users, active_cnt_users_percent,
+                         new_user_to_week, new_user_to_day,
+                         water_track_cnt, activity_track_cnt, sleep_track_cnt)
 
 
 async def owner_stats():
@@ -34,5 +38,5 @@ async def user_stats(user_id):
     """Получает и форматирует статистику пользователя"""
     stats = await get_user_full_stats(user_id)
     if not stats:
-        return "Ошибка при загрузке статистики"
+        return None
     return user_stats_msg(stats)

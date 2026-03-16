@@ -5,7 +5,7 @@ from functools import wraps
 import logging
 from requests.exceptions import ReadTimeout, ConnectionError
 from database import init_db, add_user, update_user_activity_smart, update_username, \
-    count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info, get_all_admin
+    count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info, get_all_admin, is_user_banned
 from handlers.broadcast import broadcast_send, accept_broadcast
 from handlers.owner_menu import add_admin, remove_admin, return_admin
 from handlers.sports.admin_exercises import exercise_management, start_add_exercise, handle_exercise_name, \
@@ -29,7 +29,8 @@ from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_ca
     timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
     technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
     admin_ticket_section_keyboard, water_goal_not_set_keyboard, admin_exercise_keyboard, \
-     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard, cancel_any_keyboard
+     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard, cancel_any_keyboard, \
+    stats_keyboard, admin_search_cancel
 from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
     activity_setup_required_msg, activity_goal_selection_msg, activity_tracker_setup_msg, \
     add_new_adm_msg, remove_adm_msg, \
@@ -37,16 +38,30 @@ from messages import start_message, nf_cmd, adm_start_message, exit_home, exampl
     water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
     support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
     my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, \
-    exercise_cancel_msg, media_is_closed_msg
+    exercise_cancel_msg, media_is_closed_msg, banned_msg
 from handlers.settings import set_reminder_type_water, water_smart_type_install, \
     water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg, activity_settings_open, \
     activity_reminder_open, activity_smart_type_install, activity_interval_open, activity_setting_interval, \
-    activity_goal_settings, activity_goal_custom_stg, activity_stg_cancel
-from handlers.sleeps import sleeps_main
+    activity_goal_settings, activity_goal_custom_stg, activity_stg_cancel, \
+    sleep_settings_open, sleep_stg_sleep_time_open, sleep_stg_wake_time_open, \
+    sleep_select_sleep_time, sleep_select_wake_time, \
+    sleep_request_custom_sleep_time, sleep_request_custom_wake_time, \
+    sleep_custom_sleep_time_input, sleep_custom_wake_time_input, \
+    sleep_toggle_reminder, sleep_stg_cancel, sleep_custom_time_cancel
+from handlers.sleeps import sleeps_main, handle_sleep_log_start, handle_sleep_log_end, handle_sleep_history
+from handlers.leaderboard import show_leaderboard, show_xp_profile
+from handlers.ai.analyzer import ai_analyze_profile
 from handlers.stats import adm_stats, owner_stats, user_stats
+from handlers.admin_users import (
+    admin_users_start, admin_user_search,
+    admin_ban_user, admin_unban_user,
+    admin_xp_start, admin_xp_input,
+    admin_xp_cancel,
+    admin_go_to_search,
+)
 from config import token, is_admin, is_owner
 from utils.fsm import user_states, get_state, set_state, clear_state
-bot = AsyncTeleBot(token, parse_mode='Markdown')
+bot = AsyncTeleBot(token, parse_mode='HTML' )
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -83,6 +98,9 @@ def error_handler(func):
 async def start(message):
     clear_state(message.chat.id)
     user_is_admin = await is_admin(message.chat.id)
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, banned_msg)
+        return
     logging.info(f"Пользователь {message.chat.id} запустил бота")
     if is_owner(message.chat.id):
         await add_user(message.chat.id, message.from_user.username,
@@ -108,6 +126,9 @@ async def start(message):
 
 @bot.message_handler(content_types=['text'], func=lambda msg: user_states.get(msg.chat.id) is not None)
 async def state_handler(message):
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, banned_msg)
+        return
     state, data = get_state(message.chat.id)
     match state:
         case 'waiting_broadcast_text':
@@ -127,6 +148,14 @@ async def state_handler(message):
             await water_goal_custom_stg(bot, message, *data)
         case 'waiting_custom_activity_goal':
             await activity_goal_custom_stg(bot, message, *data)
+        case 'waiting_custom_sleep_time':
+            await sleep_custom_sleep_time_input(bot, message, *data)
+        case 'waiting_custom_wake_time':
+            await sleep_custom_wake_time_input(bot, message, *data)
+        case 'waiting_user_search':
+            await admin_user_search(message, bot)
+        case 'waiting_admin_xp':
+            await admin_xp_input(message, bot)
         case 'adding_exercise':
             if data == {}:
                 await handle_exercise_name(message, bot)
@@ -180,6 +209,9 @@ async def handle_video_with_state(message):
 @bot.message_handler(content_types=['text'])
 # @error_handler
 async def msg(message):
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, banned_msg)
+        return
     await update_username(message.chat.id, message.from_user.username, bot)
     await update_user_activity_smart(message.chat.id)
     match message.text:
@@ -207,14 +239,16 @@ async def msg(message):
                 )
 
         case "😴 Сон":
-            await bot.send_message(message.chat.id, sleeps_main())
+            await sleeps_main(message, bot)
 
         case "📊 Статистика":
             stats_text = await user_stats(message.chat.id)
+            if stats_text is None:
+                stats_text = "Ошибка при загрузке статистики"
             await bot.send_message(
                 message.chat.id,
                 stats_text,
-                reply_markup=cancel_any_keyboard()
+                reply_markup=stats_keyboard()
             )
 
         case "⚙️ Настройки":
@@ -243,6 +277,8 @@ async def msg(message):
             await bot.send_message(message.chat.id,
                                    example_broadcast, reply_markup=cancel_br_start())
             set_state(message.chat.id, 'waiting_broadcast_text', None)
+        case '🔍 Пользователи' if await is_admin(message.chat.id):
+            await admin_users_start(message, bot)
         case '💪 Управление упражнениями' if await is_admin(message.chat.id):
             await exercise_management(message, bot)
         case '👨‍⚕️ Обращения' if await is_admin(message.chat.id):
@@ -266,6 +302,9 @@ async def msg(message):
 @bot.callback_query_handler(func=lambda call: True)
 # @error_handler
 async def callback_inline(call):
+    if await is_user_banned(call.message.chat.id):
+        await bot.answer_callback_query(call.id, "🚫 Ваш аккаунт заблокирован.", show_alert=True)
+        return
     match call.data:
         case data if data.startswith('timezone_'):
             await select_timezone(call, bot)
@@ -314,7 +353,7 @@ async def callback_inline(call):
         case 'activity_settings':
             await activity_settings_open(call, bot)
         case 'dream_settings':
-            pass
+            await sleep_settings_open(call, bot)
 
         case 'review_settings':
             pass
@@ -402,6 +441,36 @@ async def callback_inline(call):
             await activity_goal_settings(call, bot, step)
         case 'activity_stg_cancel':
             await activity_stg_cancel(call, bot)
+        # ── SLEEP ──────────────────────────────────────────────────────────────
+        case 'sleep_stg_sleep_time':
+            await sleep_stg_sleep_time_open(call, bot)
+        case 'sleep_stg_wake_time':
+            await sleep_stg_wake_time_open(call, bot)
+        case data if data.startswith('select_sleep_time_'):
+            await sleep_select_sleep_time(call, bot)
+        case data if data.startswith('select_wake_time_'):
+            await sleep_select_wake_time(call, bot)
+        case 'sleep_time_custom':
+            await sleep_request_custom_sleep_time(call, bot)
+        case 'wake_time_custom':
+            await sleep_request_custom_wake_time(call, bot)
+        case 'sleep_time_exit':
+            await sleep_settings_open(call, bot)
+        case 'wake_time_exit':
+            await sleep_settings_open(call, bot)
+        case 'sleep_stg_toggle_reminder':
+            await sleep_toggle_reminder(call, bot)
+        case 'sleep_stg_cancel':
+            await sleep_stg_cancel(call, bot)
+        case 'sleep_custom_time_cancel':
+            await sleep_custom_time_cancel(call, bot)
+        case 'sleep_log_start':
+            await handle_sleep_log_start(call, bot)
+        case 'sleep_log_end':
+            await handle_sleep_log_end(call, bot)
+        case 'sleep_history':
+            await handle_sleep_history(call, bot)
+
         case 'cancel_settings' | 'water_add_exit':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)
@@ -551,8 +620,40 @@ async def callback_inline(call):
             await cancel_delete_exercise(call, bot)
         case 'admin_exercise_stats':
             await stats_exercise(call, bot)
+        case 'ai_analyze':
+            await ai_analyze_profile(call, bot)
+        case data if data.startswith('adm_ban_'):
+            await admin_ban_user(call, bot)
+        case data if data.startswith('adm_unban_'):
+            await admin_unban_user(call, bot)
+        case data if data.startswith('adm_xp_add_'):
+            await admin_xp_start(call, bot, 'add')
+        case data if data.startswith('adm_xp_sub_'):
+            await admin_xp_start(call, bot, 'sub')
+        case data if data.startswith('adm_xp_cancel_'):
+            await admin_xp_cancel(call, bot)
+        case 'adm_search_cancel':
+            clear_state(call.message.chat.id)
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'cancel_any':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
+        case 'back_to_stats':
+            stats_text = await user_stats(call.message.chat.id)
+            if stats_text is None:
+                stats_text = "Ошибка при загрузке статистики"
+            try:
+                await bot.edit_message_text(
+                    stats_text,
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=stats_keyboard()
+                )
+            except Exception:
+                await bot.send_message(call.message.chat.id, stats_text, reply_markup=stats_keyboard())
+        case 'leaderboard_open' | 'leaderboard_refresh':
+            await show_leaderboard(call, bot)
+        case 'xp_profile':
+            await show_xp_profile(call, bot)
         case 'sports_check_all':
             await sports_check_all_start(call, bot)
         case 'sports_check_favorites':

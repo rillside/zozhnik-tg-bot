@@ -13,12 +13,13 @@ async def save_media_to_channel(bot, file_id, media_type='photo'):
     """
     Сохраняет медиафайл в канал хранения.
 
-    Args:
+    Приимает:
         bot: Экземпляр бота
         file_id: ID файла для сохранения
         media_type: Тип медиа ('photo', 'video' или 'animation')
 
-    Returns:
+    Возвращает:
+        tuple: (channel_message_id, new_file_id) или (None, file_id) при ошибке
         tuple: (channel_message_id, new_file_id) или (None, file_id) при ошибке
     """
     try:
@@ -69,7 +70,7 @@ async def send_media_with_fallback(bot, chat_id, file_id, channel_message_id,
     Сначала пытается отправить по file_id.
     Если не получается - пересылает из канала и обновляет file_id через callback.
 
-    Args:
+    Приимает:
         bot: Экземпляр бота
         chat_id: ID чата получателя
         file_id: Текущий file_id
@@ -80,7 +81,7 @@ async def send_media_with_fallback(bot, chat_id, file_id, channel_message_id,
         update_callback: Async функция для обновления file_id в БД
                         Должна принимать новый file_id как аргумент
 
-    Returns:
+    Возвращает:
         Отправленное сообщение или None при ошибке
     """
 

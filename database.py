@@ -12,6 +12,7 @@ async def get_connection():
         conn = await aiosqlite.connect('database.db')
         await conn.execute("PRAGMA journal_mode = WAL")
         await conn.execute("PRAGMA busy_timeout = 10000")
+        await conn.execute("PRAGMA foreign_keys = ON")
         yield conn
         await conn.commit()
 
@@ -43,7 +44,7 @@ async def init_db():
                     user_id INTEGER PRIMARY KEY,
                     timezone INTEGER,
                     broadcast_type TEXT,
-                    broadcast_interval TIME,
+                    broadcast_interval INTEGER,
                     last_broadcast TIMESTAMP,
                     goal_ml TEXT,
                     Monday TEXT DEFAULT 0,
@@ -55,7 +56,8 @@ async def init_db():
                     Sunday TEXT DEFAULT 0,
                     Total TEXT DEFAULT 0,
                     last_update TIMESTAMP,
-                    last_reset TEXT
+                    last_reset TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )
             ''')
 
@@ -65,7 +67,8 @@ async def init_db():
             user_id INTEGER NOT NULL,
             amount INTEGER NOT NULL,
             added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            week_start TEXT
+            week_start TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
             )
             ''')
 
@@ -82,9 +85,6 @@ async def init_db():
         )
         ''')
         await conn.execute('''
-        INSERT OR IGNORE INTO track_activity (user_id) SELECT user_id FROM users
-        ''')
-        await conn.execute('''
         CREATE TABLE IF NOT EXISTS exercises (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -96,7 +96,8 @@ async def init_db():
             created_by INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_active BOOLEAN DEFAULT 1
+            is_active BOOLEAN DEFAULT 1,
+            FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL
             )
             ''')
         await conn.execute('''
@@ -131,21 +132,64 @@ async def init_db():
                 status_for_admin TEXT DEFAULT 'new',
                 type TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
             )
             ''')
         await conn.execute('''
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id INTEGER,
+                ticket_id INTEGER NOT NULL,
                 text TEXT,
                 is_from_user BOOLEAN,
                 type_msg TEXT DEFAULT 'string',
                 file_id TEXT DEFAULT NULL,
                 channel_message_id INTEGER,
-                date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON DELETE CASCADE
             )
             ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS track_sleep (
+                user_id INTEGER PRIMARY KEY,
+                timezone INTEGER,
+                sleep_time TEXT,
+                wake_time TEXT,
+                reminders_enabled INTEGER DEFAULT 1,
+                last_sleep_reminder TIMESTAMP,
+                last_wake_reminder TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            )
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS sleep_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                sleep_start TIMESTAMP,
+                wake_up TIMESTAMP,
+                duration INTEGER,
+                logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            )
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS user_xp (
+                user_id INTEGER PRIMARY KEY,
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 1,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            )
+        ''')
+        await conn.execute('''
+            CREATE TABLE IF NOT EXISTS xp_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                xp_gained INTEGER NOT NULL,
+                logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            )
+        ''')
 
 
 async def add_user(user_id, username, status):
@@ -165,6 +209,8 @@ async def add_user(user_id, username, status):
             ''', (user_id, username, status))
             await conn.execute('''INSERT INTO track_water (user_id) VALUES (?)''', (user_id,))
             await conn.execute('''INSERT INTO track_activity (user_id) VALUES (?)''', (user_id,))
+            await conn.execute('''INSERT INTO track_sleep (user_id) VALUES (?)''', (user_id,))
+            await conn.execute('''INSERT INTO user_xp (user_id) VALUES (?)''', (user_id,))
             _logger.info(f"Added new user: {user_id} - {'@' + username} - {status}")
 
 
@@ -374,6 +420,7 @@ async def set_timezone(user_id, new_timezone):
         await conn.execute('UPDATE users SET timezone = ? WHERE user_id = ? ', (new_timezone, user_id))
         await conn.execute('UPDATE track_water SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
         await conn.execute('UPDATE track_activity SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
+        await conn.execute('UPDATE track_sleep SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
 
 
 async def get_timezone(user_id):
@@ -949,6 +996,23 @@ async def get_user_full_stats(user_id):
         )
         activity_weekly = (await cursor.fetchone())[0]
 
+        # Статистика по сну
+        cursor = await conn.execute(
+            'SELECT sleep_time, wake_time FROM track_sleep WHERE user_id = ?', (user_id,)
+        )
+        sleep_row = await cursor.fetchone()
+        sleep_time_val = sleep_row[0] if sleep_row else None
+        wake_time_val = sleep_row[1] if sleep_row else None
+
+        cursor = await conn.execute(
+            '''SELECT AVG(duration), COUNT(*) FROM sleep_logs
+               WHERE user_id = ? AND wake_up IS NOT NULL AND wake_up >= datetime('now', '-7 days')''',
+            (user_id,)
+        )
+        sleep_week_row = await cursor.fetchone()
+        sleep_avg = int(sleep_week_row[0]) if sleep_week_row and sleep_week_row[0] else None
+        sleep_week_count = sleep_week_row[1] if sleep_week_row else 0
+
         return {
             'username': username,
             'status': status,
@@ -962,5 +1026,328 @@ async def get_user_full_stats(user_id):
                 'goal': activity_goal,
                 'today': activity_today,
                 'weekly': activity_weekly
+            },
+            'sleep': {
+                'sleep_time': sleep_time_val,
+                'wake_time': wake_time_val,
+                'avg_duration': sleep_avg,
+                'week_count': sleep_week_count
             }
         }
+
+
+
+async def get_sleep_settings(user_id):
+    """Возвращает (sleep_time, wake_time, reminders_enabled) или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            'SELECT sleep_time, wake_time, reminders_enabled FROM track_sleep WHERE user_id = ?',
+            (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def update_sleep_time(user_id, sleep_time):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_sleep SET sleep_time = ? WHERE user_id = ?',
+            (sleep_time, user_id)
+        )
+
+
+async def update_wake_time(user_id, wake_time):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_sleep SET wake_time = ? WHERE user_id = ?',
+            (wake_time, user_id)
+        )
+
+
+async def toggle_sleep_reminders(user_id):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_sleep SET reminders_enabled = 1 - reminders_enabled WHERE user_id = ?',
+            (user_id,)
+        )
+        cursor = await conn.execute(
+            'SELECT reminders_enabled FROM track_sleep WHERE user_id = ?', (user_id,)
+        )
+        result = await cursor.fetchone()
+    return bool(result[0])
+
+
+async def log_sleep_start(user_id):
+    """Начинает новую сессию сна, закрывая незакрытые."""
+    now_user = await get_user_time_now(user_id)
+    now_str = now_user.strftime('%Y-%m-%d %H:%M:%S')
+    async with get_connection() as conn:
+        # Закрываем незакрытые сессии
+        await conn.execute(
+            '''UPDATE sleep_logs SET wake_up = ?,
+               duration = CAST((julianday(?) - julianday(sleep_start)) * 1440 AS INTEGER)
+               WHERE user_id = ? AND wake_up IS NULL''',
+            (now_str, now_str, user_id)
+        )
+        await conn.execute(
+            'INSERT INTO sleep_logs (user_id, sleep_start) VALUES (?, ?)',
+            (user_id, now_str)
+        )
+
+
+async def log_wake_up(user_id):
+    """Закрывает активную сессию сна. Возвращает длительность в минутах или None."""
+    now_user = await get_user_time_now(user_id)
+    now_str = now_user.strftime('%Y-%m-%d %H:%M:%S')
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT id, sleep_start FROM sleep_logs
+               WHERE user_id = ? AND wake_up IS NULL ORDER BY logged_at DESC LIMIT 1''',
+            (user_id,)
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        log_id, sleep_start = row
+        # Парсим с запасным форматом для старых записей с микросекундами
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f'):
+            try:
+                sleep_start_dt = datetime.strptime(sleep_start[:26], fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            _logger.error(f"log_wake_up: не удалось распарсить sleep_start='{sleep_start}', сессия удалена")
+            await conn.execute('DELETE FROM sleep_logs WHERE id = ?', (log_id,))
+            return None
+        duration = int((now_user - sleep_start_dt).total_seconds() / 60)
+        await conn.execute(
+            'UPDATE sleep_logs SET wake_up = ?, duration = ? WHERE id = ?',
+            (now_str, duration, log_id)
+        )
+    return duration
+
+
+async def get_open_sleep_session(user_id):
+    """Возвращает активную (незакрытую) сессию сна (id, sleep_start) или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT id, sleep_start FROM sleep_logs
+               WHERE user_id = ? AND wake_up IS NULL ORDER BY logged_at DESC LIMIT 1''',
+            (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_last_sleep_log(user_id):
+    """Возвращает последнюю завершённую запись (id, sleep_start, wake_up, duration)."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT id, sleep_start, wake_up, duration FROM sleep_logs
+               WHERE user_id = ? AND wake_up IS NOT NULL ORDER BY wake_up DESC LIMIT 1''',
+            (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_sleep_week_stats(user_id):
+    """Возвращает (count, avg_duration, min_duration, max_duration) за 7 дней."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT COUNT(*), AVG(duration), MIN(duration), MAX(duration)
+               FROM sleep_logs WHERE user_id = ? AND wake_up IS NOT NULL
+               AND wake_up >= datetime('now', '-7 days')''',
+            (user_id,)
+        )
+        return await cursor.fetchone()
+
+
+async def get_sleep_history(user_id, limit=7):
+    """Возвращает последние завершённые записи (sleep_start, wake_up, duration)."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT sleep_start, wake_up, duration FROM sleep_logs
+               WHERE user_id = ? AND wake_up IS NOT NULL ORDER BY wake_up DESC LIMIT ?''',
+            (user_id, limit)
+        )
+        return await cursor.fetchall()
+
+
+async def get_users_for_sleep_reminders():
+    """Пользователи с настроенными временами и включёнными напоминаниями."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT user_id, sleep_time, wake_time, timezone,
+               last_sleep_reminder, last_wake_reminder
+               FROM track_sleep
+               WHERE sleep_time IS NOT NULL AND wake_time IS NOT NULL
+               AND reminders_enabled = 1'''
+        )
+        return await cursor.fetchall()
+
+
+async def update_sleep_last_sleep_reminder(user_id):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_sleep SET last_sleep_reminder = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (user_id,)
+        )
+
+
+async def update_sleep_last_wake_reminder(user_id):
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE track_sleep SET last_wake_reminder = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (user_id,)
+        )
+
+
+async def get_all_sleep_settings_for_quiet_hours():
+    """Возвращает {user_id: (sleep_time, wake_time, timezone)} для тихих часов."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT user_id, sleep_time, wake_time, timezone
+               FROM track_sleep WHERE sleep_time IS NOT NULL AND wake_time IS NOT NULL'''
+        )
+        rows = await cursor.fetchall()
+    return {row[0]: (row[1], row[2], row[3] or 0) for row in rows}
+
+
+
+
+# Таблица очков за действия
+XP_REWARDS = {
+    'water_add': 5,          # добавил воду
+    'water_goal': 20,        # выполнил дневную цель по воде
+    'exercise_done': 10,     # выполнил упражнение
+    'exercise_goal': 30,     # выполнил дневную цель по упражнениям
+    'sleep_good': 40,        # хороший сон (≥ 7ч)
+    'sleep_ok': 20,          # нормальный сон (5–7ч)
+    'sleep_short': 5,        # короткий сон (< 5ч, но что-то всё же)
+    'streak_bonus': 15,      # ежедневный заход в бот (раз в день)
+}
+
+# Формула уровня: уровень = 1 + floor(xp / 100)  → каждые 100 XP = +1 уровень
+XP_PER_LEVEL = 100
+
+
+def xp_to_level(xp: int) -> int:
+    return 1 + xp // XP_PER_LEVEL
+
+
+def xp_for_next_level(xp: int) -> int:
+    """XP нужно до следующего уровня."""
+    return XP_PER_LEVEL - (xp % XP_PER_LEVEL)
+
+
+async def add_xp(user_id: int, action: str) -> dict:
+    """
+    Начисляет очки пользователю и обновляет уровень.
+    Возвращает dict: {xp_gained, old_level, new_level, total_xp, leveled_up}.
+    """
+    gained = XP_REWARDS.get(action, 0)
+    if gained == 0:
+        return {'xp_gained': 0, 'leveled_up': False, 'new_level': 1, 'total_xp': 0, 'old_level': 1}
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT xp, level FROM user_xp WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            await conn.execute('INSERT INTO user_xp (user_id, xp, level) VALUES (?, ?, ?)',
+                               (user_id, 0, 1))
+            old_xp, old_level = 0, 1
+        else:
+            old_xp, old_level = row
+        new_xp = old_xp + gained
+        new_level = xp_to_level(new_xp)
+        await conn.execute('UPDATE user_xp SET xp = ?, level = ? WHERE user_id = ?',
+                           (new_xp, new_level, user_id))
+        await conn.execute('INSERT INTO xp_log (user_id, action, xp_gained) VALUES (?, ?, ?)',
+                           (user_id, action, gained))
+    return {
+        'xp_gained': gained,
+        'old_level': old_level,
+        'new_level': new_level,
+        'total_xp': new_xp,
+        'leveled_up': new_level > old_level,
+    }
+
+
+async def get_user_xp(user_id: int) -> tuple:
+    """Возвращает (xp, level)."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT xp, level FROM user_xp WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+    return (row[0], row[1]) if row else (0, 1)
+
+
+async def get_leaderboard(limit: int = 20) -> list:
+    """
+    Возвращает топ-N: [(rank, user_id, username, xp, level), ...]
+    Только пользователи с xp > 0.
+    """
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT u.user_id, u.username, x.xp, x.level
+               FROM user_xp x
+               JOIN users u ON u.user_id = x.user_id
+               WHERE x.xp > 0
+               ORDER BY x.xp DESC
+               LIMIT ?''',
+            (limit,)
+        )
+        rows = await cursor.fetchall()
+    return [(i + 1, row[0], row[1], row[2], row[3]) for i, row in enumerate(rows)]
+
+
+async def get_user_rank(user_id: int) -> int | None:
+    """Возвращает позицию пользователя в глобальном топе или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM user_xp
+               WHERE xp > (SELECT xp FROM user_xp WHERE user_id = ?)''',
+            (user_id,)
+        )
+        row = await cursor.fetchone()
+    return (row[0] + 1) if row else None
+
+
+async def search_user(query: str):
+    """Поиск пользователя по user_id или username.
+    Возвращает (user_id, username, status, created_date, last_activity, timezone) или None."""
+    async with get_connection() as conn:
+        query = query.strip().lstrip('@')
+        if query.isdigit():
+            cursor = await conn.execute(
+                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE user_id = ?',
+                (int(query),)
+            )
+        else:
+            cursor = await conn.execute(
+                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE username = ?',
+                (query,)
+            )
+        return await cursor.fetchone()
+
+
+async def admin_set_xp(user_id: int, delta: int) -> int:
+    """Прибавляет (или вычитает при delta < 0) XP пользователю.
+    Возвращает новое значение XP."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT xp, level FROM user_xp WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            await conn.execute('INSERT INTO user_xp (user_id, xp, level) VALUES (?, ?, ?)', (user_id, 0, 1))
+            current_xp = 0
+        else:
+            current_xp = row[0]
+        new_xp = max(0, current_xp + delta)
+        new_level = xp_to_level(new_xp)
+        await conn.execute('UPDATE user_xp SET xp = ?, level = ? WHERE user_id = ?', (new_xp, new_level, user_id))
+    return new_xp
+
+
+async def is_user_banned(user_id: int) -> bool:
+    """Проверяет, забанен ли пользователь."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+    return row is not None and row[0] == 'BANNED'

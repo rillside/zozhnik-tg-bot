@@ -6,6 +6,7 @@ from messages import water_custom_input_accept_msg, water_custom_input_limit_msg
     add_water_msg, water_tracker_dashboard_msg, water_add_custom_input_msg, cancellation,water_add_time_limit_msg, \
     water_add_hard_limit_msg, water_add_reasonable_limit_msg
 from utils.fsm import set_state, clear_state
+from utils.xp_helper import award_xp
 
 
 async def validate_water_addition(info, added_water_ml):
@@ -48,6 +49,11 @@ async def handle_add_water(call, bot, step):
                                  current_goal, water_drunk),
                              reply_markup=water_add_keyboard()
                              )
+            # XP за добавление воды
+            await award_xp(bot, call.message.chat.id, 'water_add')
+            # XP за достижение дневной цели
+            if water_drunk >= current_goal:
+                await award_xp(bot, call.message.chat.id, 'water_goal')
         if msg:
             await bot.send_message(call.message.chat.id, msg)
     elif step == 'request_value':

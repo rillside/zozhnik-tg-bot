@@ -5,11 +5,12 @@ from database import get_active_exercises, get_exercise_by_id, check_ex_is_favor
     get_user_exercise_stats_for_exercise, get_last_exercise_log, get_activity_goal_and_today_count
 from keyboards import sports_main_menu_keyboard, sports_category_keyboard, sports_difficulty_keyboard, \
     sports_all_pagination_keyboard, sports_exercise_keyboard, sports_favorites_pagination_keyboard, \
-    sports_favorites_empty_keyboard, cancel_any_keyboard, sports_confirm_done_keyboard
+    cancel_any_keyboard, sports_confirm_done_keyboard
 from messages import sports_main_menu_msg, sports_category_msg, sports_difficulty_msg, sports_ex_list_msg, \
     sports_exercise_details_msg, sports_not_found_ex_msg, sports_favorites_empty_msg, sports_favorites_header_msg, \
     sports_my_stats_msg, sports_my_stats_empty_msg, sports_exercise_done_msg, sports_ex_stats_msg, \
     sports_stats_top_item_msg, sports_confirm_done_msg, sports_done_too_soon_same_msg, sports_done_too_soon_other_msg
+from utils.xp_helper import award_xp
 
 
 def check_can_log_exercise(last_log, exercise_id):
@@ -254,6 +255,12 @@ async def sports_confirm_done(call, bot):
     await add_exercise_log(user_id, ex_id)
     await bot.answer_callback_query(call.id, sports_exercise_done_msg)
     await sports_show_exercise_for_ex_id(call, bot, ex_id)
+    # XP за упражнение
+    await award_xp(bot, user_id, 'exercise_done')
+    # XP за достижение дневной цели
+    goal, today_count = await get_activity_goal_and_today_count(user_id)
+    if goal and today_count >= goal:
+        await award_xp(bot, user_id, 'exercise_goal')
 
 
 async def sports_cancel_done(call, bot):

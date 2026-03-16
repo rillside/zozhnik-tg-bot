@@ -33,7 +33,8 @@ except ValueError:
 
 owners = load_owners()
 owners_copy = owners[:]
-ai_censor_enabled = True
+ai_censor_enabled = False
+ai_analyzer_enabled = False
 censorship_threshold = 0.5 #Порог срабатывания AI цензуры
 
 def save_owners():
