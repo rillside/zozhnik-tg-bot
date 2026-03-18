@@ -2,7 +2,7 @@ from config import owners
 from database import get_username_by_id
 
 
-def plural_days(count):
+def plural_days(count: int) -> str:
     """Возвращает правильное склонение слова "день" для числа count."""
 
     # Особые случаи для чисел 11-19
@@ -19,7 +19,8 @@ def plural_days(count):
     else:
         return f"{count} дней"
 
-def timezone_selection_msg(first_name):
+def timezone_selection_msg(first_name: str) -> str:
+    """Сообщение выбора часового пояса при первом запуске."""
     return f"""📍 <b>Настройка часового пояса</b>
 
 {first_name}, для корректной работы напоминаний выбери свой часовой пояс!
@@ -50,7 +51,8 @@ def timezone_selection_msg(first_name):
 🎯 Потрать 10 секунд сейчас — и получай напоминания вовремя всегда!"""
 
 
-def start_message(first_name):
+def start_message(first_name: str) -> str:
+    """Приветственное сообщение для нового пользователя."""
     start_msg = f"""
         🥰 Привет, <b>{first_name}</b>! Приятно познакомиться!
 
@@ -69,9 +71,12 @@ def start_message(first_name):
     return start_msg
 
 
-def adm_stats_msg(cnt_users, active_cnt_users, active_cnt_users_percent,
-                  new_user_to_week, new_user_to_day,
-                  water_track_cnt, activity_track_cnt, sleep_track_cnt):
+# Администрирование
+
+def adm_stats_msg(cnt_users: int, active_cnt_users: int, active_cnt_users_percent: float,
+                  new_user_to_week: int, new_user_to_day: int,
+                  water_track_cnt: int, activity_track_cnt: int, sleep_track_cnt: int) -> str:
+    """Сообщение с административной статистикой платформы."""
     return f"""📊 <b>Статистика платформы</b>
 
 👥 <b>Аудитория:</b>
@@ -86,7 +91,8 @@ def adm_stats_msg(cnt_users, active_cnt_users, active_cnt_users_percent,
 """
 
 
-def adm_start_message(first_name, id):
+def adm_start_message(first_name: str, id: int) -> str:
+    """Приветственное сообщение для входа админа/владельца в панель управления."""
     adm_start_msg = f"""
 🛠️ Привет, <b>{first_name}!</b>
 
@@ -105,19 +111,23 @@ def adm_start_message(first_name, id):
     return adm_start_msg
 
 
-def success_new_admin(name):
+def success_new_admin(name: str) -> str:
+    """Уведомление о успешном назначении администратора."""
     return f"✅ Пользователь {name.strip()} теперь администратор!"
 
 
-def success_remove_admin(name):
+def success_remove_admin(name: str) -> str:
+    """Уведомление о успешном снятии прав администратора."""
     return f"✅ Пользователь {name.strip()} больше не администратор!"
 
 
-def attempt_demote_owner(id, username):
+def attempt_demote_owner(id: int, username: str | None) -> str:
+    """Сообщение владельцу о попытке снять его права."""
     return f"⚠️ Вас попытался снять Владелец {'@' + username if username is not None else id}"
 
 
-def broadcast_stats(succ, unsucc):
+def broadcast_stats(succ: int, unsucc: int) -> str:
+    """Отчёт о результатах массовой рассылки."""
     return f"""🎉 <b>Рассылка отправлена!</b>
 
 
@@ -125,7 +135,8 @@ def broadcast_stats(succ, unsucc):
 🚫 Ошибка отправки — <b>{unsucc}</b>"""
 
 
-def censorship_violation_msg(sender_id, sender_username, text_br, content_type):
+def censorship_violation_msg(sender_id: int, sender_username: str | None, text_br: str, content_type: str) -> str:
+    """Сообщение админам о нарушении цензуры."""
     content_type_names = {
         'supp': 'тикете',
         'br': 'рассылке',
@@ -151,14 +162,16 @@ def censorship_violation_msg(sender_id, sender_username, text_br, content_type):
     """
 
 
-def broadcast_return_adm(owner_id, owner_username, user_username):
+def broadcast_return_adm(owner_id: int, owner_username: str | None, user_username: str | None) -> str:
+    """Сообщение о восстановлении админских прав."""
     return (f"🔓 Владелец "
             f"{'@' + owner_username if owner_username is not None else owner_id}"
             f" вернул права Администратору "
             f"{'@' + user_username if user_username is not None else owner_id}")
 
 
-def adm_update_username_msg(user_id, old_username, new_username):
+def adm_update_username_msg(user_id: int, old_username: str | None, new_username: str | None) -> str:
+    """Уведомление админам о смене username администратора."""
     return f"""🔄 <b>Администратор сменил username</b>
 
 🆔 <b>ID:</b> {user_id}
@@ -168,7 +181,8 @@ def adm_update_username_msg(user_id, old_username, new_username):
 ➡️ Стало: <b>{'@' + new_username if new_username is not None else 'Не установлен'}</b>"""
 
 
-def broadcast_add_adm_msg(user_id, owner_id):
+def broadcast_add_adm_msg(user_id: int, owner_id: int) -> str:
+    """Сообщение-рассылка админам о назначении нового администратора."""
     owner_username = get_username_by_id(owner_id)
     user_username = get_username_by_id(user_id)
     return (f"👑 {'@' + owner_username if owner_username is not None else owner_id}"
@@ -177,7 +191,8 @@ def broadcast_add_adm_msg(user_id, owner_id):
             )
 
 
-def broadcast_remove_adm_msg(user_id, owner_id):
+def broadcast_remove_adm_msg(user_id: int, owner_id: int) -> str:
+    """Сообщение-рассылка админам о снятии администратора."""
     owner_username = get_username_by_id(owner_id)
     user_username = get_username_by_id(user_id)
     return (f"👑 {'@' + owner_username if owner_username is not None else owner_id}"
@@ -186,7 +201,10 @@ def broadcast_remove_adm_msg(user_id, owner_id):
             )
 
 
-def settings_msg(first_name):
+# Настройки
+
+def settings_msg(first_name: str) -> str:
+    """Главное сообщение раздела настроек."""
     return f"""🔧 <b>Настройки напоминаний</b>
 
 {first_name}, выбери категорию для настройки:
@@ -197,7 +215,10 @@ def settings_msg(first_name):
 • 📈 <b>Обзор</b> — Посмотреть мои текущие цели."""
 
 
-def water_tracker_setup_msg(first_name):
+# Водный трекер
+
+def water_tracker_setup_msg(first_name: str) -> str:
+    """Сообщение настройки водного трекера."""
     return f"""🚰 <b>Настройка водного трекера</b>
 
 {first_name}, давай настроим твою цель по воде!
@@ -213,7 +234,8 @@ def water_tracker_setup_msg(first_name):
 ✨ Выбери, что хочешь настроить:"""
 
 
-def water_goal_selection_msg(first_name):
+def water_goal_selection_msg(first_name: str) -> str:
+    """Сообщение выбора дневной цели по воде."""
     return f"""💧 <b>Выбор дневной цели по воде</b>
 
 {first_name}, давай определим твою цель на день!
@@ -229,7 +251,8 @@ def water_goal_selection_msg(first_name):
 💡 Совет: Начни с <b>2 литров</b> и корректируй по ощущениям!"""
 
 
-def water_reminder_type_selection_msg(first_name):
+def water_reminder_type_selection_msg(first_name: str) -> str:
+    """Сообщение выбора типа напоминаний о воде."""
     return f"""💧 <b>Выбор типа напоминаний</b>
 
 {first_name}, как ты хочешь получать напоминания о воде?
@@ -247,7 +270,8 @@ def water_reminder_type_selection_msg(first_name):
 ✨ Выбери подходящий вариант:"""
 
 
-def water_interval_setup_msg(first_name):
+def water_interval_setup_msg(first_name: str) -> str:
+    """Сообщение настройки интервальных напоминаний о воде."""
     return f"""⏰ <b>Настройка интервальных напоминаний</b>
 
 {first_name}, установи интервал между напоминаниями о воде:
@@ -265,11 +289,13 @@ def water_interval_setup_msg(first_name):
 ✨ Выбери из списка или введи своё значение:"""
 
 
-def water_goal_success_msg(volume):
+def water_goal_success_msg(volume: int) -> str:
+    """Уведомление об успешном установлении цели по воде."""
     return f"💧 Цель: {volume} мл. установлена!"
 
 
-def water_interval_selected_short_msg(interval_hours):
+def water_interval_selected_short_msg(interval_hours: int) -> str:
+    """Короткое подтверждение выбранного интервала напоминаний о воде."""
     intervals_text = {
         1: "каждый час",
         2: "каждые 2 часа",
@@ -280,7 +306,8 @@ def water_interval_selected_short_msg(interval_hours):
     return f"✅ Установлен интервал: {intervals_text[interval_hours]}"
 
 
-def water_tracker_dashboard_msg(first_name, current_goal, water_drunk):
+def water_tracker_dashboard_msg(first_name: str, current_goal: int, water_drunk: int) -> str:
+    """Дашборд водного трекера с прогресс-баром."""
     progress_percent = round(water_drunk / current_goal * 100)
     water_left = current_goal - water_drunk if water_drunk < current_goal else 0
     filled_blocks = int(progress_percent / 10)
@@ -322,7 +349,8 @@ def water_tracker_dashboard_msg(first_name, current_goal, water_drunk):
 ✨ Каждый глоток приближает к цели!"""
 
 
-def owner_stats_msg(admins):
+def owner_stats_msg(admins: list) -> str:
+    """Список администраторов для владельца."""
     if not admins:
         return "👑 Список администрации:\n\n📭 Администраторы не найдены"
 
@@ -334,7 +362,8 @@ def owner_stats_msg(admins):
     return "👑 Список администрации\n\n" + "\n\n".join(admins_list)
 
 
-def water_quick_reminder_msg(current_goal, water_drunk):
+def water_quick_reminder_msg(current_goal: int, water_drunk: int) -> str:
+    """Короткое напоминание от планировщика выпить воды."""
     water_left = max(0, current_goal - water_drunk)
 
     return f"""💧 <b>Напоминание от ЗОЖника</b>
@@ -350,11 +379,13 @@ def water_quick_reminder_msg(current_goal, water_drunk):
 💡 Выпей сейчас и обнови статистику! ⬇️✨"""
 
 
-def water_add_time_limit_msg(wait_time):
+def water_add_time_limit_msg(wait_time: int) -> str:
+    """Сообщение о необходимости подождать перед следующей записью."""
     return f"⏳ Подождите {wait_time} мин. перед следующей записью"
 
 
-def water_add_hard_limit_msg(daily_hard_limit):
+def water_add_hard_limit_msg(daily_hard_limit: int) -> str:
+    """Сообщение о превышении суточного лимита воды."""
     return f"""❌ <b>Превышен безопасный суточный лимит</b>
 
 Вы попытались добавить больше <b>{daily_hard_limit // 1000} литров</b> воды за день.
@@ -374,7 +405,8 @@ def water_add_hard_limit_msg(daily_hard_limit):
 ✨ Забота о здоровье — это <b>баланс и умеренность!</b>"""
 
 
-def water_add_reasonable_limit_msg(over_amount):
+def water_add_reasonable_limit_msg(over_amount: int) -> str:
+    """Сообщение о превышении рекомендованной нормы воды."""
     return f"""⚠️ <b>Внимание: превышение рекомендуемой нормы</b>
 
 Вы превысили рекомендуемую суточную норму на <b>{over_amount} мл.</b>
@@ -393,7 +425,10 @@ def water_add_reasonable_limit_msg(over_amount):
 ✨ Помните: правильная гидратация — <b>ключ к хорошему самочувствию!</b>"""
 
 
-def support_selection_msg(first_name):
+# Поддержка
+
+def support_selection_msg(first_name: str) -> str:
+    """Главное сообщение выбора типа обращения."""
     return f"""🛠️ <b>Направь свой запрос</b>
 
 {first_name}, выбери категорию обращения:
@@ -416,7 +451,8 @@ def support_selection_msg(first_name):
 🎯 Просто выбери подходящий вариант!"""
 
 
-def create_ticket_msg(type_supp):
+def create_ticket_msg(type_supp: str) -> str:
+    """Сообщение с просьбой ввести заголовок тикета."""
     return f"""📝 Заголовок обращения
 
 Напишите краткое название вашего запроса.
@@ -426,11 +462,13 @@ def create_ticket_msg(type_supp):
     "«Подбор индивидуальной нормы воды»"}"""
 
 
-def ticket_limit_error_msg(max_length=50, content='заголовок'):
+def ticket_limit_error_msg(max_length: int = 50, content: str = 'заголовок') -> str:
+    """Ошибка превышения лимита символов в тикете."""
     return f"❌ Лимит: {max_length} символов. Сократите {content}."
 
 
-def aggressive_content_warning_msg(content_type):
+def aggressive_content_warning_msg(content_type: str) -> str:
+    """Предупреждение пользователю о слишком резком содержании."""
     return f"""💬 Небольшое напоминание
 
 Мы заметили, что в {content_type} есть формулировки, которые могут звучать слишком резко.
@@ -448,7 +486,9 @@ def aggressive_content_warning_msg(content_type):
 ✨ Готовы продолжить?"""
 
 
-def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, messages_history):
+def open_ticket_msg(ticket_id: int, title: str, type_ticket: str, created_date: str,
+                    update_date: str, messages_history: list) -> str:
+    """Содержимое открытого тикета со стороны пользователя."""
     cnt_photo = 0
     # Эмодзи для типа
     type_emoji = "🔧" if type_ticket == 'tech' else "👨‍⚕️"
@@ -479,8 +519,10 @@ def open_ticket_msg(ticket_id, title, type_ticket, created_date, update_date, me
     return msg
 
 
-def admin_open_ticket_msg(ticket_id, title, user_id, username, first_name, status, type_ticket, created_date,
-                          update_date, messages_history):
+def admin_open_ticket_msg(ticket_id: int, title: str, user_id: int, username: str | None,
+                          first_name: str, status: str, type_ticket: str, created_date: str,
+                          update_date: str, messages_history: list) -> str:
+    """Содержимое открытого тикета со стороны администратора."""
     cnt_photo = 0
     # Эмодзи для типа
     type_emoji = "🔧" if type_ticket == 'tech' else "👨‍⚕️"
@@ -532,29 +574,34 @@ def admin_open_ticket_msg(ticket_id, title, user_id, username, first_name, statu
     return msg
 
 
-def notify_new_message_in_ticket(ticket_id):
+def notify_new_message_in_ticket(ticket_id: int) -> str:
+    """Уведомление пользователю о новом ответе в его тикете."""
     return f"👤 Поступил ответ в обращении #{ticket_id}."
 
 
-def admin_notify_new_ticket(ticket_id, type_ticket):
+def admin_notify_new_ticket(ticket_id: int, type_ticket: str) -> str:
+    """Уведомление админам о новом тикете."""
     type_text = "Техподдержка" if type_ticket == 'tech' else "Консультация"
 
     return f"👤 Открыт новый тикет #{ticket_id}. Тип: {type_text}"
 
 
-def admin_notify_new_message_in_ticket(ticket_id, type_ticket):
+def admin_notify_new_message_in_ticket(ticket_id: int, type_ticket: str) -> str:
+    """Уведомление админам о новом сообщении в тикете."""
     type_text = "Техподдержка" if type_ticket == 'tech' else "Консультация"
 
     return f"👤 Новое сообщение в тикете #{ticket_id}. Тип: {type_text}"
 
 
-def ticket_closed_msg(ticket_id=None):
+def ticket_closed_msg(ticket_id: int | None = None) -> str:
+    """Сообщение о закрытии диалога."""
     return f"""📭 Обращение {'#' + ticket_id if ticket_id else ''} закрыто
 
 Диалог завершён. Если потребуется помощь — создайте новое обращение."""
 
 
-def confirm_delete_ticket_msg(ticket_id):
+def confirm_delete_ticket_msg(ticket_id: int) -> str:
+    """Сообщение подтверждения удаления тикета."""
     return f"""🗑️ Подтверждение удаления
 
 Вы собираетесь удалить обращение #{ticket_id}.
@@ -565,7 +612,8 @@ def confirm_delete_ticket_msg(ticket_id):
 """
 
 
-def admin_ticket_section_msg(first_name):
+def admin_ticket_section_msg(first_name: str) -> str:
+    """Общеознакомительное сообщение админа перед выбором типа обращений."""
     return f"""📨 Раздел обращений
 
 {first_name}, здесь собраны все запросы пользователей.
@@ -588,18 +636,21 @@ def admin_ticket_section_msg(first_name):
 ✨ Быстро, удобно и всё под рукой!"""
 
 
-def admin_tickets_msg(ticket_type):
+def admin_tickets_msg(ticket_type: str) -> str:
+    """Заголовок списка обращений для админа."""
     return f"""📋 Обращения от пользователей
 Тип: {'🔧 Техподдержка' if ticket_type == 'tech' else '👨‍⚕️ Консультации'}
 
 Выберите обращение:"""
 
 
-def exit_home(menu_type='Главное'):
+def exit_home(menu_type: str = 'Главное') -> str:
+    """Сообщение возврата в меню."""
     return f"🔙 Возврат в {menu_type} меню"
 
 
-def remove_adm_censor_msg(content_type):
+def remove_adm_censor_msg(content_type: str) -> str:
+    """Сообщение админу об ограничении его прав из-за цензуры."""
     return f"""🚫 Ваши админ-права ограничены
 
 Ваше сообщение содержит запрещённые слова и было отклонено системой.
@@ -612,7 +663,8 @@ def remove_adm_censor_msg(content_type):
 По всем вопросам обращайтесь к владельцу бота"""
 
 
-def water_custom_input_limit_msg(amount_ml, min_limit=50, max_limit=1500):
+def water_custom_input_limit_msg(amount_ml: int, min_limit: int = 50, max_limit: int = 1500) -> str:
+    """Сообщение об ошибке при вводе недопустимого объёма воды."""
     return f"""❌ Некорректное значение
 
 Количество {amount_ml} мл выходит за допустимые пределы.
@@ -629,7 +681,8 @@ def water_custom_input_limit_msg(amount_ml, min_limit=50, max_limit=1500):
 🎯 Каждая разумная порция приближает к цели!"""
 
 
-def water_custom_input_accept_msg(amount_ml):
+def water_custom_input_accept_msg(amount_ml: int) -> str:
+    """Сообщение подтверждения пользовательского ввода объёма воды."""
     return f"""💧 Подтверждение
 
 Добавить {amount_ml} мл воды к твоему дневному балансу?
@@ -640,7 +693,8 @@ def water_custom_input_accept_msg(amount_ml):
 ✨ Каждая порция учитывается в прогрессе!"""
 
 
-def water_add_custom_input_msg(first_name):
+def water_add_custom_input_msg(first_name: str) -> str:
+    """Приглашение ввести произвольный объём выпитой воды."""
     return f"""💧 Введи своё значение
 
 {first_name}, отправь количество воды в миллилитрах, которое ты выпил:
@@ -660,7 +714,10 @@ def water_add_custom_input_msg(first_name):
 🎯 Каждая порция учитывается и приближает тебя к цели!"""
 
 
-def admin_exercise_menu_msg(first_name):
+# Упражнения
+
+def admin_exercise_menu_msg(first_name: str) -> str:
+    """Главное сообщение панели управления упражнениями."""
     return f"""🏋️ Управление упражнениями
 
 {first_name}, выберите действие:
@@ -672,7 +729,8 @@ def admin_exercise_menu_msg(first_name):
 ⚡ Все изменения сразу доступны пользователям!"""
 
 
-def exercise_confirm_msg(name, description, category, difficulty, has_video=False):
+def exercise_confirm_msg(name: str, description: str, category: str, difficulty: str, has_video: bool = False) -> str:
+    """Сообщение подтверждения добавления нового упражнения."""
     """Сообщение с данными упражнения для подтверждения"""
 
     # Словарь для отображения категорий
@@ -712,14 +770,16 @@ def exercise_confirm_msg(name, description, category, difficulty, has_video=Fals
 ✅ Всё верно? Подтвердите сохранение или отмените."""
 
 
-def aggressive_exercise_info_msg(name, description):
+def aggressive_exercise_info_msg(name: str, description: str) -> str:
+    """Предупреждение админу о подозрительном содержании в упражнении."""
     return f"""🏋️ <b>Название:</b> {name}
 
 📝 <b>Описание:</b>
 {description}"""
 
 
-def exercise_saved_msg(name):
+def exercise_saved_msg(name: str) -> str:
+    """Упражнение успешно сохранено."""
     return f"""✅ Упражнение успешно добавлено!
 
 🏋️ Название: {name}
@@ -732,9 +792,10 @@ def exercise_saved_msg(name):
 • Вернуться в меню"""
 
 
-def exercise_full_details_msg(ex_id, name, description, category, difficulty, created_by, created_at, is_active,
-                              has_video=False):
-    """Формирует сообщение с полными данными упражнения"""
+def exercise_full_details_msg(ex_id: int, name: str, description: str, category: str, difficulty: str,
+                              created_by: int, created_at: str, is_active: bool,
+                              has_video: bool = False) -> str:
+    """Подробное описание упражнения для панели администратора."""
 
     # Словари для отображения
     categories = {
@@ -779,7 +840,8 @@ def exercise_full_details_msg(ex_id, name, description, category, difficulty, cr
 Выберите, что хотите изменить:"""
 
 
-def confirm_delete_exercise_msg(ex_id):
+def confirm_delete_exercise_msg(ex_id: int) -> str:
+    """Сообщение подтверждения удаления упражнения."""
     return f"""🗑️ <b>Подтверждение удаления</b>
 
 Вы уверены, что хотите удалить упражнение №{ex_id}?
@@ -794,7 +856,8 @@ def confirm_delete_exercise_msg(ex_id):
 Выберите действие:"""
 
 
-def exercise_stats_msg(stats):
+def exercise_stats_msg(stats: dict) -> str:
+    """Сводная статистика всех упражнений для администратора."""
     text = f"""📊 <b>Статистика упражнений</b>
 
 📌 <b>Всего упражнений:</b> {stats['total']}
@@ -810,8 +873,8 @@ def exercise_stats_msg(stats):
     return text
 
 
-def sports_activity_progress_bar(goal, today_count):
-    """Прогресс-бар по цели упражнений на день."""
+def sports_activity_progress_bar(goal: int, today_count: int) -> str:
+    """Генерирует текстовый прогресс-бар активности."""
     pct = min(100, round(today_count / goal * 100)) if goal else 0
     filled = int(pct / 10)
     empty = 10 - filled
@@ -819,7 +882,8 @@ def sports_activity_progress_bar(goal, today_count):
     return f"📊 <b>Прогресс:</b> {today_count}/{goal} {bar} {pct}%\n\n"
 
 
-def sports_main_menu_msg(first_name, goal=None, today_count=0):
+def sports_main_menu_msg(first_name: str, goal: int | None = None, today_count: int = 0) -> str:
+    """Главное сообщение раздела Физ-активность."""
     progress = ""
     if goal is not None and goal > 0:
         progress = sports_activity_progress_bar(goal, today_count)
@@ -834,8 +898,9 @@ def sports_main_menu_msg(first_name, goal=None, today_count=0):
 Выбери раздел:"""
 
 
-def sports_exercise_details_msg(name, description, category, difficulty, is_favorite=False, has_video=False):
-    """Формирует сообщение с деталями упражнения для пользователя"""
+def sports_exercise_details_msg(name: str, description: str, category: str, difficulty: str,
+                                is_favorite: bool = False, has_video: bool = False) -> str:
+    """Карточка упражнения для пользователя с деталями и доступными действиями."""
 
     categories = {
         'strength': '💪 Силовые',
@@ -878,7 +943,8 @@ def sports_exercise_details_msg(name, description, category, difficulty, is_favo
 """
 
 
-def sports_my_stats_msg(total, weekly, top_list):
+def sports_my_stats_msg(total: int, weekly: int, top_list: list) -> str:
+    """Сообщение с личной статистикой выполнения упражнений."""
     return f"""📊 <b>Мой прогресс</b>
 
 <b>Всего выполнений:</b> {total}
@@ -897,7 +963,8 @@ sports_my_stats_empty_msg = """📊 <b>Мой прогресс</b>
 sports_exercise_done_msg = "✅ Отлично! Выполнение засчитано."
 
 
-def sports_stats_top_item_msg(name, cnt):
+def sports_stats_top_item_msg(name: str, cnt: int) -> str:
+    """Строка списка популярных упражнений."""
     return f"• {name}: <b>{cnt}</b> раз"
 
 
@@ -908,22 +975,28 @@ sports_confirm_done_msg = """✅ <b>Подтверждение</b>
 Нажмите <b>Подтвердить</b>, чтобы засчитать выполнение."""
 
 
-def sports_done_too_soon_same_msg(mins):
+def sports_done_too_soon_same_msg(mins: int) -> str:
+    """Предупреждение: это же упражнение выполнено слишком недавно."""
     return f"⏱ Одно и то же упражнение можно отмечать не чаще раза в 15 минут. Подождите ещё {mins} мин."
 
 
-def sports_done_too_soon_other_msg(mins):
+def sports_done_too_soon_other_msg(mins: int) -> str:
+    """Предупреждение: любое упражнение выполнено слишком недавно."""
     return f"⏱ Лимит между разными упражнениями — не менее 5 минут. Подождите ещё {mins} мин."
 
 
-def sports_ex_stats_msg(total, weekly):
+def sports_ex_stats_msg(total: int, weekly: int) -> str:
+    """Короткая статистика выполнения конкретного упражнения."""
     return f"""📊 <b>Статистика по упражнению</b>
 
 <b>Всего раз:</b> {total}
 <b>За неделю:</b> {weekly}"""
 
 
-def activity_tracker_setup_msg(first_name):
+# Физическая активность
+
+def activity_tracker_setup_msg(first_name: str) -> str:
+    """Сообщение настройки трекера активности."""
     return f"""💪 <b>Настройка трекера активности</b>
 
 {first_name}, давай настроим твои цели по упражнениям!
@@ -939,7 +1012,8 @@ def activity_tracker_setup_msg(first_name):
 ✨ Выбери, что настроить:"""
 
 
-def activity_goal_selection_msg(first_name):
+def activity_goal_selection_msg(first_name: str) -> str:
+    """Сообщение выбора дневной цели по упражнениям."""
     return f"""🎯 <b>Выбор ежедневной цели</b>
 
 {first_name}, сколько упражнений планируешь выполнять в день?
@@ -960,11 +1034,13 @@ activity_setup_required_msg = """💪 <b>Настройка обязательн
 Нажми <b>Настроить</b>, чтобы перейти к настройкам."""
 
 
-def activity_goal_success_msg(goal):
+def activity_goal_success_msg(goal: int) -> str:
+    """Уведомление об успешном установлении цели по активности."""
     return f"✅ Ежедневная цель: {goal} упражнений установлена!"
 
 
-def activity_reminder_type_selection_msg(first_name):
+def activity_reminder_type_selection_msg(first_name: str) -> str:
+    """Сообщение выбора типа напоминаний об активности."""
     return f"""⏰ <b>Напоминания о разминке</b>
 
 {first_name}, как хочешь получать напоминания?
@@ -980,7 +1056,8 @@ def activity_reminder_type_selection_msg(first_name):
 ✨ Выбери вариант:"""
 
 
-def activity_interval_setup_msg(first_name):
+def activity_interval_setup_msg(first_name: str) -> str:
+    """Сообщение настройки интервала напоминаний об активности."""
     return f"""⏰ <b>Интервал напоминаний</b>
 
 {first_name}, как часто напоминать о разминке?
@@ -999,11 +1076,13 @@ activity_goal_limit_msg = "❌ Укажите число от 1 до 30!"
 activity_goal_incorrect_format_msg = "❌ Введите целое число от 1 до 30."
 
 
-def activity_interval_selected_msg(hours):
+def activity_interval_selected_msg(hours: int) -> str:
+    """Короткое подтверждение выбранного интервала напоминаний об активности."""
     return f"✅ Интервал: каждые {hours} ч."
 
 
-def activity_quick_reminder_msg(today_count, goal):
+def activity_quick_reminder_msg(today_count: int, goal: int) -> str:
+    """Короткое напоминание от планировщика сделать упражнение."""
     return f"""💪 <b>Время размяться!</b>
 
 Сегодня выполнено: <b>{today_count}/{goal}</b> упражнений.
@@ -1011,7 +1090,11 @@ def activity_quick_reminder_msg(today_count, goal):
 Напоминаю выполнить ещё одно — это займёт пару минут!"""
 
 
-def sleep_tracker_setup_msg(first_name, sleep_time=None, wake_time=None, reminders_enabled=True):
+# Трекер сна
+
+def sleep_tracker_setup_msg(first_name: str, sleep_time: str | None = None,
+                            wake_time: str | None = None, reminders_enabled: bool = True) -> str:
+    """Сообщение настройки трекера сна."""
     current = ""
     if sleep_time and wake_time:
         current = f"\n\n✅ <b>Текущие настройки:</b>\n🌙 Отбой: {sleep_time} | ☀️ Подъём: {wake_time}"
@@ -1040,8 +1123,9 @@ sleep_not_set_msg = """😴 <b>Трекер сна не настроен</b>
 Нажми <b>Настроить</b>, чтобы перейти к настройкам."""
 
 
-def sleep_dashboard_msg(first_name, sleep_time, wake_time, last_sleep, avg_duration,
-                         is_sleeping, sleep_start=None):
+def sleep_dashboard_msg(first_name: str, sleep_time: str, wake_time: str, last_sleep: tuple | None,
+                         avg_duration: float | None, is_sleeping: bool, sleep_start: str | None = None) -> str:
+    """Сообщение дашборда трекера сна с текущим состоянием и последней сессией."""
     schedule = f"🌙 Отбой: <b>{sleep_time}</b> | ☀️ Подъём: <b>{wake_time}</b>"
 
     if is_sleeping and sleep_start:
@@ -1076,7 +1160,8 @@ def sleep_dashboard_msg(first_name, sleep_time, wake_time, last_sleep, avg_durat
 {action_hint}"""
 
 
-def sleep_time_selection_msg(first_name):
+def sleep_time_selection_msg(first_name: str) -> str:
+    """Сообщение выбора времени отбоя."""
     return f"""🌙 <b>Время отбоя</b>
 
 {first_name}, во сколько ты обычно ложишься спать?
@@ -1084,7 +1169,8 @@ def sleep_time_selection_msg(first_name):
 За 30 минут до этого времени придёт напоминание."""
 
 
-def wake_time_selection_msg(first_name):
+def wake_time_selection_msg(first_name: str) -> str:
+    """Сообщение выбора времени подъёма."""
     return f"""☀️ <b>Время подъёма</b>
 
 {first_name}, во сколько обычно просыпаешься?
@@ -1092,19 +1178,23 @@ def wake_time_selection_msg(first_name):
 В это время придёт доброе утро ☀️"""
 
 
-def sleep_time_set_msg(time_str):
+def sleep_time_set_msg(time_str: str) -> str:
+    """Уведомление об установке времени отбоя."""
     return f"🌙 Время отбоя установлено: <b>{time_str}</b>"
 
 
-def wake_time_set_msg(time_str):
+def wake_time_set_msg(time_str: str) -> str:
+    """Уведомление об установке времени подъёма."""
     return f"☀️ Время подъёма установлено: <b>{time_str}</b>"
 
 
-def sleep_log_start_msg(time_str):
+def sleep_log_start_msg(time_str: str) -> str:
+    """Сообщение о начале отслеживания сна."""
     return f"😴 Сон начат в <b>{time_str}</b>.\n\nСпокойной ночи! 🌙"
 
 
-def sleep_log_end_msg(duration_min):
+def sleep_log_end_msg(duration_min: int) -> str:
+    """Сообщение о завершении сессии сна с оценкой продолжительности."""
     h, m = divmod(duration_min, 60)
     dur = f"{h}ч {m}мин" if h else f"{m}мин"
     if duration_min >= 420:
@@ -1122,7 +1212,8 @@ def sleep_log_end_msg(duration_min):
 {status}"""
 
 
-def sleep_history_msg(records):
+def sleep_history_msg(records: list) -> str:
+    """История сна за последние записи."""
     if not records:
         return "📋 <b>История сна</b>\n\nЗаписей пока нет. Начни отслеживание прямо сейчас!"
     lines = ["📋 <b>История сна (последние 7 сессий)</b>\n"]
@@ -1149,15 +1240,17 @@ sleep_custom_time_input_msg = """✏️ <b>Введи время в формат
 sleep_time_format_error_msg = "❌ Неверный формат. Введи время в формате ЧЧ:ММ (например, 23:00)"
 
 
-def sleep_reminder_before_msg(sleep_time):
-    return f"""🌙 <b>Скоро время спать!</b>
+def sleep_reminder_before_msg(sleep_time: str) -> str:
+    """Напоминание о приближающемся времени отбоя."""
+    return f"""🌙 <b>Скоро идти спать!</b>
 
 Через 30 минут — запланированный отбой ({sleep_time}).
 
 Заверши дела, подготовься ко сну и хорошо отдохни 🛏️"""
 
 
-def sleep_reminder_wakeup_msg(wake_time):
+def sleep_reminder_wakeup_msg(wake_time: str) -> str:
+    """Напоминание о приближающемся времени подъёма."""
     return f"""☀️ <b>Доброе утро!</b>
 
 Настало время подъёма ({wake_time}).
@@ -1165,15 +1258,16 @@ def sleep_reminder_wakeup_msg(wake_time):
 Не забудь отметить пробуждение в трекере! 😊"""
 
 
-def sleep_reminder_toggle_msg(enabled):
+def sleep_reminder_toggle_msg(enabled: bool) -> str:
+    """Сообщение об изменении состояния напоминаний сна."""
     return "🔔 Напоминания о сне включены!" if enabled else "🔕 Напоминания о сне отключены"
 
 
 sleep_no_open_session_msg = "😴 Нет активной сессии сна. Нажми «Ложусь спать»чтобы начать!"
 
 
-def user_stats_msg(stats):
-    """Форматирует статистику пользователя"""
+def user_stats_msg(stats: dict) -> str:
+    """Форматирует подробную статистику пользователя для отображения."""
     # Парсим дату регистрации
     from datetime import datetime
     try:
@@ -1665,13 +1759,11 @@ sports_favorites_header_msg = """❤️ <b>Избранное</b>
 Ваши любимые упражнения:"""
 
 
-# ─────────────────────────────── SLEEP EXTRA ──────────────────────────────────
+# XP и уровни
 
-def sleep_too_soon_msg(wait_mins):
+def sleep_too_soon_msg(wait_mins: int) -> str:
+    """Сообщение о слишком раннем завершении сессии сна."""
     return f"⏳ Рано просыпаться! Подождите ещё {wait_mins} мин. (минимум 30 минут сна)"
-
-
-# ─────────────────────────────── XP / GAMIFICATION ────────────────────────────
 
 LEVEL_TITLES = {
     1: "🌱 Новичок",
@@ -1687,6 +1779,7 @@ LEVEL_TITLES = {
 
 
 def get_level_title(level: int) -> str:
+    """Возвращает текстовый титул для заданного уровня пользователя."""
     title = "🌱 Новичок"
     for lvl, t in sorted(LEVEL_TITLES.items()):
         if level >= lvl:
@@ -1695,10 +1788,12 @@ def get_level_title(level: int) -> str:
 
 
 def xp_gained_msg(action_name: str, xp: int, total_xp: int, level: int) -> str:
+    """Короткое уведомление о полученных XP за действие."""
     return f"✨ +{xp} XP за {action_name}! Уровень {level} · {total_xp} XP"
 
 
 def level_up_msg(new_level: int, total_xp: int) -> str:
+    """Поздравление с повышением уровня."""
     title = get_level_title(new_level)
     return f"""🎉 <b>ПОВЫШЕНИЕ УРОВНЯ!</b>
 
@@ -1710,8 +1805,9 @@ def level_up_msg(new_level: int, total_xp: int) -> str:
 Продолжай в том же духе! 💪"""
 
 
-def profile_xp_msg(first_name: str, xp: int, level: int, rank) -> str:
-    from database import xp_for_next_level, XP_PER_LEVEL
+def profile_xp_msg(first_name: str, xp: int, level: int, rank: int | None) -> str:
+    """Страница XP-профиля пользователя с прогресс-баром до следующего уровня."""
+    from database import XP_PER_LEVEL, xp_for_next_level
     title = get_level_title(level)
     to_next = xp_for_next_level(xp)
     progress_pct = round((xp % XP_PER_LEVEL) / XP_PER_LEVEL * 100)
@@ -1734,8 +1830,10 @@ def profile_xp_msg(first_name: str, xp: int, level: int, rank) -> str:
 banned_msg = "🚫 <b>Ваш аккаунт заблокирован.</b>\n\nВы не можете пользоваться этим ботом."
 
 
-def user_profile_admin_msg(user_id, username, status, created_date, last_activity, timezone,
-                            xp, level, rank) -> str:
+def user_profile_admin_msg(user_id: int, username: str | None, status: str, created_date: str,
+                            last_activity: str, timezone: int | None,
+                            xp: int, level: int, rank: int | None) -> str:
+    """Сообщение с полным профилем пользователя для администратора."""
     from datetime import datetime
     try:
         reg_fmt = datetime.strptime(created_date, '%Y-%m-%d %H:%M:%S').strftime('%d.%m.%Y')
@@ -1762,26 +1860,31 @@ def user_profile_admin_msg(user_id, username, status, created_date, last_activit
 🏆 Рейтинг: <b>{rank_str}</b>"""
 
 
-def admin_xp_change_success_msg(user_id, delta, new_xp) -> str:
+def admin_xp_change_success_msg(user_id: int, delta: int, new_xp: int) -> str:
+    """Сообщение об успешном изменении XP пользователя администратором."""
     sign = '+' if delta > 0 else ''
     return f"✅ XP пользователя <code>{user_id}</code> изменён: <b>{sign}{delta}</b>\nТекущий XP: <b>{new_xp}</b>"
 
 
 def user_search_not_found_msg(query: str) -> str:
+    """Сообщение об отсутствии пользователя при поиске."""
     return f"❌ Пользователь <code>{query}</code> не найден в базе данных."
 
 
-def user_banned_notify_msg(admin_username) -> str:
+def user_banned_notify_msg(admin_username: str | None) -> str:
+    """Уведомление пользователю о блокировке его аккаунта."""
     adm = f"@{admin_username}" if admin_username else "Администратор"
     return f"🚫 Ваш аккаунт заблокирован администратором {adm}."
 
 
-def user_unbanned_notify_msg(admin_username) -> str:
+def user_unbanned_notify_msg(admin_username: str | None) -> str:
+    """Уведомление пользователю о снятии блокировки его аккаунта."""
     adm = f"@{admin_username}" if admin_username else "Администратор"
     return f"✅ Ваш аккаунт разблокирован администратором {adm}."
 
 
-def leaderboard_msg(rows: list, user_rank, user_xp: int, user_level: int) -> str:
+def leaderboard_msg(rows: list, user_rank: int | None, user_xp: int, user_level: int) -> str:
+    """Сообщение таблицы лидеров с позицией текущего пользователя."""
     if not rows:
         return "🏆 <b>Таблица лидеров</b>\n\nПока никто не набрал очков. Будь первым!"
     lines = ["🏆 <b>Таблица лидеров</b>\n"]

@@ -1,66 +1,192 @@
 import asyncio
-import telebot
-from telebot.async_telebot import AsyncTeleBot
-from functools import wraps
 import logging
-from requests.exceptions import ReadTimeout, ConnectionError
-from database import init_db, add_user, update_user_activity_smart, update_username, \
-    count_users_trackers, water_stats, get_timezone, tickets_by_user, load_tickets_info, get_all_admin, is_user_banned
-from handlers.broadcast import broadcast_send, accept_broadcast
-from handlers.owner_menu import add_admin, remove_admin, return_admin
-from handlers.sports.admin_exercises import exercise_management, start_add_exercise, handle_exercise_name, \
-    handle_exercise_description, handle_exercise_category, handle_exercise_difficulty, handle_exercise_video, \
-    save_exercise, open_video, exercise_go_back, edit_exercise_start, edit_exercise_handle_category, \
-    edit_exercise_show_list, open_exercise_for_edit, save_exercise_changes, handle_exercise_edit, \
-    accept_delete_exercise, delete_exercise, cancel_delete_exercise, stats_exercise, skip_exercise_video
-from handlers.sports.user_exercises import sports_start, sports_check_all_start, sports_handle_category, \
-    sports_show_list, sports_show_exercise, toggle_favorite, sports_check_favorites_start, \
-    sports_show_favorites_page, sports_back_to_categories, sports_back_to_main, sports_mark_done, \
-    sports_confirm_done, sports_cancel_done, sports_show_my_stats, sports_show_exercise_stats
-from utils.antispam import mark_group_warned, is_group_warned
-from utils.censorship.checker import censor_load
-from utils.scheduler import Scheduler
-from handlers.support.support import create_ticket, opening_ticket, handle_delete_ticket, \
-    handling_aggressive_content, ticket_exit, admin_look_tickets, tickets_exit, look_ticket_page, \
-    send_message_to_ticket, opening_photo_in_ticket
-from handlers.water import handle_add_water, add_custom_water
-from keyboards import main_menu, admin_menu, owner_menu, cancel_br_start, own_cancel, settings_keyboard, \
-    water_setup_keyboard, water_goal_keyboard, get_water_interval_keyboard, water_add_keyboard, \
-    timezone_selection_keyboard, support_selection_keyboard, consultation_support_keyboard, \
-    technical_support_keyboard, supp_ticket_cancel_keyboard, opening_ticket_keyboard, \
-    admin_ticket_section_keyboard, water_goal_not_set_keyboard, admin_exercise_keyboard, \
-     activity_goal_not_set_keyboard, activity_goal_keyboard, activity_setup_keyboard, cancel_any_keyboard, \
-    stats_keyboard, admin_search_cancel
-from messages import start_message, nf_cmd, adm_start_message, exit_home, example_broadcast, cancellation, \
-    activity_setup_required_msg, activity_goal_selection_msg, activity_tracker_setup_msg, \
-    add_new_adm_msg, remove_adm_msg, \
-    error_msg, settings_msg, water_tracker_setup_msg, water_goal_selection_msg, water_interval_setup_msg, \
-    water_tracker_dashboard_msg, water_goal_not_set_msg, timezone_selection_msg, support_selection_msg, \
-    support_tech_msg, support_consult_msg, create_ticket_msg, no_active_tickets_msg, opening_ticket_msg, \
-    my_tickets_msg, admin_ticket_section_msg, send_media_group_error_msg, \
-    exercise_cancel_msg, media_is_closed_msg, banned_msg
-from handlers.settings import set_reminder_type_water, water_smart_type_install, \
-    water_setting_interval, select_timezone, water_goal_settings, water_goal_custom_stg, activity_settings_open, \
-    activity_reminder_open, activity_smart_type_install, activity_interval_open, activity_setting_interval, \
-    activity_goal_settings, activity_goal_custom_stg, activity_stg_cancel, \
-    sleep_settings_open, sleep_stg_sleep_time_open, sleep_stg_wake_time_open, \
-    sleep_select_sleep_time, sleep_select_wake_time, \
-    sleep_request_custom_sleep_time, sleep_request_custom_wake_time, \
-    sleep_custom_sleep_time_input, sleep_custom_wake_time_input, \
-    sleep_toggle_reminder, sleep_stg_cancel, sleep_custom_time_cancel
-from handlers.sleeps import sleeps_main, handle_sleep_log_start, handle_sleep_log_end, handle_sleep_history
-from handlers.leaderboard import show_leaderboard, show_xp_profile
-from handlers.ai.analyzer import ai_analyze_profile
-from handlers.stats import adm_stats, owner_stats, user_stats
-from handlers.admin_users import (
-    admin_users_start, admin_user_search,
-    admin_ban_user, admin_unban_user,
-    admin_xp_start, admin_xp_input,
-    admin_xp_cancel,
-    admin_go_to_search,
+from functools import wraps
+from typing import Any, Callable
+
+import telebot
+from requests.exceptions import ConnectionError, ReadTimeout
+from telebot.async_telebot import AsyncTeleBot
+
+from config import is_admin, is_owner, token
+from database import (
+    add_user,
+    count_users_trackers,
+    get_all_admin,
+    get_timezone,
+    init_db,
+    is_user_banned,
+    load_tickets_info,
+    tickets_by_user,
+    update_user_activity_smart,
+    update_username,
+    water_stats,
 )
-from config import token, is_admin, is_owner
-from utils.fsm import user_states, get_state, set_state, clear_state
+from handlers.admin_users import (
+    admin_ban_user,
+    admin_unban_user,
+    admin_user_search,
+    admin_users_start,
+    admin_xp_cancel,
+    admin_xp_input,
+    admin_xp_start,
+)
+from handlers.ai.analyzer import ai_analyze_profile
+from handlers.broadcast import accept_broadcast, broadcast_send
+from handlers.leaderboard import show_leaderboard, show_xp_profile
+from handlers.owner_menu import add_admin, remove_admin, return_admin
+from handlers.settings import (
+    activity_goal_custom_stg,
+    activity_goal_settings,
+    activity_interval_open,
+    activity_reminder_open,
+    activity_setting_interval,
+    activity_settings_open,
+    activity_smart_type_install,
+    activity_stg_cancel,
+    select_timezone,
+    set_reminder_type_water,
+    sleep_custom_sleep_time_input,
+    sleep_custom_time_cancel,
+    sleep_custom_wake_time_input,
+    sleep_request_custom_sleep_time,
+    sleep_request_custom_wake_time,
+    sleep_select_sleep_time,
+    sleep_select_wake_time,
+    sleep_settings_open,
+    sleep_stg_cancel,
+    sleep_stg_sleep_time_open,
+    sleep_stg_wake_time_open,
+    sleep_toggle_reminder,
+    water_goal_custom_stg,
+    water_goal_settings,
+    water_setting_interval,
+    water_smart_type_install,
+)
+from handlers.sleeps import (
+    handle_sleep_history,
+    handle_sleep_log_end,
+    handle_sleep_log_start,
+    sleeps_main,
+)
+from handlers.sports.admin_exercises import (
+    accept_delete_exercise,
+    cancel_delete_exercise,
+    delete_exercise,
+    edit_exercise_handle_category,
+    edit_exercise_show_list,
+    edit_exercise_start,
+    exercise_go_back,
+    exercise_management,
+    handle_exercise_category,
+    handle_exercise_description,
+    handle_exercise_difficulty,
+    handle_exercise_edit,
+    handle_exercise_name,
+    handle_exercise_video,
+    open_exercise_for_edit,
+    open_video,
+    save_exercise,
+    save_exercise_changes,
+    skip_exercise_video,
+    start_add_exercise,
+    stats_exercise,
+)
+from handlers.sports.user_exercises import (
+    sports_back_to_categories,
+    sports_back_to_main,
+    sports_cancel_done,
+    sports_check_all_start,
+    sports_check_favorites_start,
+    sports_confirm_done,
+    sports_handle_category,
+    sports_mark_done,
+    sports_show_exercise,
+    sports_show_exercise_stats,
+    sports_show_favorites_page,
+    sports_show_list,
+    sports_show_my_stats,
+    sports_start,
+    toggle_favorite,
+)
+from handlers.stats import adm_stats, owner_stats, user_stats
+from handlers.support.support import (
+    admin_look_tickets,
+    create_ticket,
+    handle_delete_ticket,
+    handling_aggressive_content,
+    look_ticket_page,
+    opening_photo_in_ticket,
+    opening_ticket,
+    send_message_to_ticket,
+    ticket_exit,
+    tickets_exit,
+)
+from handlers.water import add_custom_water, handle_add_water
+from keyboards import (
+    activity_goal_keyboard,
+    activity_goal_not_set_keyboard,
+    activity_setup_keyboard,
+    admin_exercise_keyboard,
+    admin_menu,
+    admin_search_cancel,
+    admin_ticket_section_keyboard,
+    cancel_any_keyboard,
+    cancel_br_start,
+    consultation_support_keyboard,
+    get_water_interval_keyboard,
+    main_menu,
+    opening_ticket_keyboard,
+    own_cancel,
+    owner_menu,
+    settings_keyboard,
+    stats_keyboard,
+    supp_ticket_cancel_keyboard,
+    support_selection_keyboard,
+    technical_support_keyboard,
+    timezone_selection_keyboard,
+    water_add_keyboard,
+    water_goal_keyboard,
+    water_goal_not_set_keyboard,
+    water_setup_keyboard,
+)
+from messages import (
+    activity_goal_selection_msg,
+    activity_setup_required_msg,
+    activity_tracker_setup_msg,
+    add_new_adm_msg,
+    adm_start_message,
+    admin_ticket_section_msg,
+    banned_msg,
+    cancellation,
+    create_ticket_msg,
+    error_msg,
+    example_broadcast,
+    exercise_cancel_msg,
+    exit_home,
+    media_is_closed_msg,
+    my_tickets_msg,
+    nf_cmd,
+    no_active_tickets_msg,
+    opening_ticket_msg,
+    remove_adm_msg,
+    send_media_group_error_msg,
+    settings_msg,
+    start_message,
+    support_consult_msg,
+    support_selection_msg,
+    support_tech_msg,
+    timezone_selection_msg,
+    water_goal_not_set_msg,
+    water_goal_selection_msg,
+    water_interval_setup_msg,
+    water_tracker_dashboard_msg,
+    water_tracker_setup_msg,
+)
+from utils.antispam import is_group_warned, mark_group_warned
+from utils.censorship.checker import censor_load
+from utils.fsm import clear_state, get_state, set_state, user_states
+from utils.scheduler import Scheduler
+
 bot = AsyncTeleBot(token, parse_mode='HTML' )
 logging.basicConfig(
     level=logging.INFO,
@@ -69,10 +195,19 @@ logging.basicConfig(
     force=True
 )
 
+class FakeMessage:
+    def __init__(self, message: telebot.types.Message, chat: telebot.types.Chat, from_user: telebot.types.User) -> None:
+        """Обёртка-заглушка для message, используемая внутри callback-контекста."""
+        self.message = message
+        self.chat = chat
+        self.from_user = from_user
 
-def error_handler(func):
+
+def error_handler(func: Callable) -> Callable:
+    """Декоратор для перехвата и логирования исключений в хэндлерах с отправкой пользователю сообщения об ошибке."""
     @wraps
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs) -> Any:
+        """Внутреннее обёрточное функция декоратора: вызывает хэндлер и обрабатывает исключения."""
         try:
             return await func(*args, **kwargs)
         except Exception as e:
@@ -95,7 +230,8 @@ def error_handler(func):
 
 @bot.message_handler(commands=['start'])
 # @error_handler
-async def start(message):
+async def start(message: telebot.types.Message) -> None:
+    """Обрабатывает команду /start: регистрирует пользователя и показывает главное меню или выбор часового пояса."""
     clear_state(message.chat.id)
     user_is_admin = await is_admin(message.chat.id)
     if await is_user_banned(message.chat.id):
@@ -125,7 +261,8 @@ async def start(message):
 
 
 @bot.message_handler(content_types=['text'], func=lambda msg: user_states.get(msg.chat.id) is not None)
-async def state_handler(message):
+async def state_handler(message: telebot.types.Message) -> None:
+    """Диспетчер текстовых сообщений в FSM-режиме: направляет входящий текст в нужный хэндлер по текущему состоянию."""
     if await is_user_banned(message.chat.id):
         await bot.send_message(message.chat.id, banned_msg)
         return
@@ -170,7 +307,8 @@ _locks = {}
 
 
 @bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
-async def handle_photo_with_state(message):
+async def handle_photo_with_state(message: telebot.types.Message) -> None:
+    """Обрабатывает входящие фото в FSM-контексте: защищает от медиагрупп и направляет в нужный хэндлер."""
     state, data = get_state(message.chat.id)
     async with _locks.setdefault(message.chat.id, asyncio.Lock()):
         if message.media_group_id:
@@ -195,7 +333,8 @@ async def handle_photo_with_state(message):
 
 
 @bot.message_handler(content_types=['video', 'animation'], func=lambda msg: user_states.get(msg.chat.id))
-async def handle_video_with_state(message):
+async def handle_video_with_state(message: telebot.types.Message) -> None:
+    """Обрабатывает входящие видео и анимации в FSM-контексте: передаёт файл в хэндлер добавления/редактирования упражнений."""
     state, data = get_state(message.chat.id)
     match state:
         case 'adding_exercise':
@@ -208,7 +347,8 @@ async def handle_video_with_state(message):
 
 @bot.message_handler(content_types=['text'])
 # @error_handler
-async def msg(message):
+async def msg(message: telebot.types.Message) -> None:
+    """Основной диспетчер текстовых команд главного и админского меню."""
     if await is_user_banned(message.chat.id):
         await bot.send_message(message.chat.id, banned_msg)
         return
@@ -301,12 +441,13 @@ async def msg(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 # @error_handler
-async def callback_inline(call):
+async def callback_inline(call: telebot.types.CallbackQuery) -> None:
+    """Диспетчер всех callback-запросов бота: разбирает call.data и вызывает соответствующий хэндлер."""
     if await is_user_banned(call.message.chat.id):
         await bot.answer_callback_query(call.id, "🚫 Ваш аккаунт заблокирован.", show_alert=True)
         return
     match call.data:
-        case data if data.startswith('timezone_'):
+        case data if data.startswith('timezone_') and 'settings' not in data:
             await select_timezone(call, bot)
         case data if data.startswith('br_accept_'):
             type_broadcast = data.split('_')[2]
@@ -384,8 +525,9 @@ async def callback_inline(call):
                                    reply_markup=water_goal_keyboard()
                                    )
         case data if data.startswith('water_goal_') or data == 'water_reminder_exit':
-            match int(call.data.split('_')[-1]):
-                case 1500 | 2000 | 2500 | 3000:
+            action = (call.data.split('_')[-1])
+            match action:
+                case '1500' | '2000' | '2500' | '3000':
                     step = 'set_goal'
                 case 'custom':
                     step = 'set_goal_custom'
@@ -689,9 +831,13 @@ async def callback_inline(call):
             await sports_cancel_done(call, bot)
         case data if data.startswith('sports_my_stats_'):
             await sports_show_exercise_stats(call, bot)
+        case data if data.startswith('cancel_sleep_history'):
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
+            await sleeps_main(FakeMessage(call.message,call.message.chat,call.from_user), bot)
 
 
-async def start_bot():
+async def start_bot() -> None:
+    """Инициализирует базу данных, запускает планировщик напоминаний и запускает polling бота."""
     await init_db()
     reminder_service = Scheduler(bot)
     await reminder_service.start()

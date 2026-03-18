@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 """
 Утилита для rate-limited рассылки с использованием asyncio.gather и semaphore.
@@ -11,7 +12,7 @@ SEMAPHORE_LIMIT = 15
 _logger = logging.getLogger(__name__)
 
 
-async def _send_with_semaphore(semaphore, coro):
+async def _send_with_semaphore(semaphore: asyncio.Semaphore, coro: Any) -> bool | None:
     """Выполняет корутину отправки с учётом semaphore."""
     async with semaphore:
         try:
@@ -23,7 +24,7 @@ async def _send_with_semaphore(semaphore, coro):
             _logger.warning(traceback.format_exc())
 
 
-async def rate_limited_gather(send_coroutines):
+async def rate_limited_gather(send_coroutines: list) -> tuple[int, int]:
     """
     Выполняет список корутин отправки с ограничением через semaphore.
 

@@ -1,6 +1,7 @@
 import logging
 import re
 import asyncio
+from typing import Any
 from database import replace_status
 from handlers.admin_notifications import admin_censorship_violation
 from utils.censorship.word_filter import banned_words, banned_phrases
@@ -8,7 +9,8 @@ from config import ai_censor_enabled, censorship_threshold, is_owner, owners, sa
 
 _logger = logging.getLogger(__name__)
 toxicity_checker = None
-async def censor_load():
+async def censor_load() -> None:
+    """Загружает AI-модель цензуры (Detoxify), если она включена в конфигурации."""
     global toxicity_checker
     if ai_censor_enabled:
         try:
@@ -23,7 +25,8 @@ async def censor_load():
         toxicity_checker = None
         _logger.info("AI цензура отключена")
 
-async def ai_censor(text):
+async def ai_censor(text: str) -> bool:
+    """Проверяет текст через AI-модель. Возвращает True, если текст превышает порог токсичности."""
 
     if toxicity_checker is None:
         return False
@@ -41,7 +44,8 @@ async def ai_censor(text):
         return False
 
 
-async def censor_check(text):
+async def censor_check(text: str) -> bool:
+    """Проверяет текст на наличие запрещённых слов, фраз и AI-токсичности. Возвращает True, если текст прошёл проверку."""
     words = set(re.sub(r'[^\w\s]', ' ', text.lower()).split())
     if any(i in words for i in banned_words):
         return False
@@ -51,7 +55,8 @@ async def censor_check(text):
     elif await ai_censor(text):
         return False
     return True
-async def removal_of_admin_rights(bot,message,sender_id,sender_username,content_type):
+async def removal_of_admin_rights(bot: Any, message: Any, sender_id: int, sender_username: str | None, content_type: str) -> None:
+    """Снимает права администратора за нарушение цензуры и уведомляет владельцев."""
     await replace_status('User', user_id=sender_id)
     if is_owner(sender_id):
         owners.remove(sender_id)

@@ -1,15 +1,35 @@
 from datetime import datetime, timedelta
+from typing import Any
 
-from database import update_last_add_water_ml, add_water_ml, water_stats, get_water_stats_for_today
-from keyboards import accept_custom_add_water_keyboard, cancel_custom_add_water_keyboard, water_add_keyboard
-from messages import water_custom_input_accept_msg, water_custom_input_limit_msg, water_custom_input_format_error_msg, \
-    add_water_msg, water_tracker_dashboard_msg, water_add_custom_input_msg, cancellation,water_add_time_limit_msg, \
-    water_add_hard_limit_msg, water_add_reasonable_limit_msg
-from utils.fsm import set_state, clear_state
+from database import (
+    add_water_ml,
+    get_water_stats_for_today,
+    update_last_add_water_ml,
+    water_stats,
+)
+from keyboards import (
+    accept_custom_add_water_keyboard,
+    cancel_custom_add_water_keyboard,
+    water_add_keyboard,
+)
+from messages import (
+    add_water_msg,
+    cancellation,
+    water_add_custom_input_msg,
+    water_add_hard_limit_msg,
+    water_add_reasonable_limit_msg,
+    water_add_time_limit_msg,
+    water_custom_input_accept_msg,
+    water_custom_input_format_error_msg,
+    water_custom_input_limit_msg,
+    water_tracker_dashboard_msg,
+)
+from utils.fsm import clear_state, set_state
 from utils.xp_helper import award_xp
 
 
-async def validate_water_addition(info, added_water_ml):
+async def validate_water_addition(info: tuple, added_water_ml: int | str) -> tuple[bool, str | None]:
+    """Проверяет возможность добавить воду: интервал между записями и дневные лимиты. Возвращает (ok, сообщение_об ошибке_или_None)."""
     # Константы
     min_interval = 15  # минут между записями
     daily_reasonable_limit = 5000  # мл за день (5 литров) - разумный максимум
@@ -32,7 +52,8 @@ async def validate_water_addition(info, added_water_ml):
     return True, None
 
 
-async def handle_add_water(call, bot, step):
+async def handle_add_water(call: Any, bot: Any, step: str) -> None:
+    """Диспетчер добавления воды: обрабатывает добавление порции, запрос произвольного значения или отмену."""
     if step == 'addition':
         water_add = call.data.split('_')[2]
         accept, msg = await validate_water_addition(await get_water_stats_for_today(call.message.chat.id), water_add)
@@ -77,7 +98,8 @@ async def handle_add_water(call, bot, step):
                          )
 
 
-async def add_custom_water(message, bot):
+async def add_custom_water(message: Any, bot: Any) -> None:
+    """Обрабатывает ввод произвольного объёма воды в мл: валидирует диапазон и запрашивает подтверждение."""
     ml = message.text.strip()
     if ml.isdigit():
         if 50 <= int(ml) <= 1500:

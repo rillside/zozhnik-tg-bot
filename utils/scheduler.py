@@ -1,17 +1,35 @@
-import logging
 import asyncio
+import logging
 from datetime import datetime, timedelta
+from typing import Any
+
 from database import (
-    water_stats, get_users_for_water_reminders, update_reminder_sent_time, fetch_water_stats_all,
-    set_last_reset_water, get_lost_records_of_water, water_reset, add_water_ml, delete_water_log,
-    get_users_for_activity_reminders, get_activity_goal_and_today_count, update_activity_reminder_sent_time,
-    get_last_exercise_log, get_inactive_users_for_reminder, update_last_inactivity_reminder,
-    get_users_for_sleep_reminders, update_sleep_last_sleep_reminder, update_sleep_last_wake_reminder,
+    add_water_ml,
+    delete_water_log,
+    fetch_water_stats_all,
+    get_activity_goal_and_today_count,
     get_all_sleep_settings_for_quiet_hours,
+    get_inactive_users_for_reminder,
+    get_last_exercise_log,
+    get_lost_records_of_water,
+    get_users_for_activity_reminders,
+    get_users_for_sleep_reminders,
+    get_users_for_water_reminders,
+    set_last_reset_water,
+    update_activity_reminder_sent_time,
+    update_last_inactivity_reminder,
+    update_reminder_sent_time,
+    update_sleep_last_sleep_reminder,
+    update_sleep_last_wake_reminder,
+    water_reset,
+    water_stats,
 )
 from messages import (
-    water_quick_reminder_msg, activity_quick_reminder_msg, activity_inactive_reminder_msg,
-    sleep_reminder_before_msg, sleep_reminder_wakeup_msg,
+    activity_inactive_reminder_msg,
+    activity_quick_reminder_msg,
+    sleep_reminder_before_msg,
+    sleep_reminder_wakeup_msg,
+    water_quick_reminder_msg,
 )
 from utils.rate_limit_send import rate_limited_gather
 
@@ -19,20 +37,23 @@ _logger = logging.getLogger(__name__)
 
 
 class Scheduler:
-    def __init__(self, bot):
+    def __init__(self, bot: Any) -> None:
+        """Инициализирует планировщик с экземпляром бота."""
         self.bot = bot
         self.running = False
         self.task = None
         self.check_interval = 120  # секунд
 
-    async def start(self):
+    async def start(self) -> None:
+        """Запускает фоновый цикл проверки напоминаний."""
         if self.running:
             return
         self.running = True
         self.task = asyncio.create_task(self._check_loop())
         _logger.info("Сервис напоминаний запущен")
 
-    async def stop(self):
+    async def stop(self) -> None:
+        """Останавливает планировщик и отменяет фоновую задачу."""
         self.running = False
         if self.task:
             self.task.cancel()
@@ -41,7 +62,8 @@ class Scheduler:
             except asyncio.CancelledError:
                 pass
 
-    async def _check_loop(self):
+    async def _check_loop(self) -> None:
+        """Бесконечный цикл с периодическим запуском всех проверок напоминаний."""
         while self.running:
             try:
                 await self._check_all_reminders()
@@ -52,7 +74,8 @@ class Scheduler:
                 _logger.error(f"Ошибка в планировщике задач: {e}")
                 await asyncio.sleep(60)
 
-    async def _check_all_reminders(self):
+    async def _check_all_reminders(self) -> None:
+        """Запускает все типы проверок напоминаний за один цикл."""
         quiet_hours = await get_all_sleep_settings_for_quiet_hours()
         await self._check_water_reminders(quiet_hours)
         await self._check_activity_reminders(quiet_hours)
@@ -61,7 +84,7 @@ class Scheduler:
         await self._check_weekly_water_reset()
 
     @staticmethod
-    def _is_quiet_hours(user_id, quiet_hours):
+    def _is_quiet_hours(user_id: int, quiet_hours: dict) -> bool:
         """Возвращает True, если текущее время пользователя попадает в окно сна."""
         if user_id not in quiet_hours:
             return False
@@ -77,7 +100,8 @@ class Scheduler:
         else:
             return sleep_min <= now_min < wake_min
 
-    async def _check_water_reminders(self, quiet_hours=None):
+    async def _check_water_reminders(self, quiet_hours: dict | None = None) -> None:
+        """Определяет пользователей, которым нужно отправить напоминание о воде, и рассылает его."""
         users = await get_users_for_water_reminders()
         now_time_utc = datetime.now() - timedelta(hours=3)
         to_remind = []
@@ -101,7 +125,8 @@ class Scheduler:
             coros = [self._send_water_reminder(uid) for uid in to_remind]
             await rate_limited_gather(coros)
 
-    async def _send_water_reminder(self, user_id):
+    async def _send_water_reminder(self, user_id: int) -> None:
+        """Отправляет одно напоминание о воде конкретному пользователю и обновляет время отправки."""
         try:
             current_goal, water_drunk = await water_stats(user_id)
             await self.bot.send_message(user_id, water_quick_reminder_msg(current_goal, water_drunk))
@@ -111,7 +136,8 @@ class Scheduler:
         except Exception as e:
             _logger.error(f" Ошибка отправки напоминания user_id={user_id}: {e}")
 
-    async def _check_activity_reminders(self, quiet_hours=None):
+    async def _check_activity_reminders(self, quiet_hours: dict | None = None) -> None:
+        """Определяет пользователей, которым нужно напомнить об активности, и рассылает напоминания."""
         users = await get_users_for_activity_reminders()
         now_utc = datetime.utcnow()
         to_remind = []
@@ -141,7 +167,8 @@ class Scheduler:
             coros = [self._send_activity_reminder(uid) for uid in to_remind]
             await rate_limited_gather(coros)
 
-    async def _send_activity_reminder(self, user_id):
+    async def _send_activity_reminder(self, user_id: int) -> None:
+        """Отправляет одно напоминание об активности конкретному пользователю."""
         try:
             goal, today_count = await get_activity_goal_and_today_count(user_id)
             if goal is None:
@@ -152,7 +179,8 @@ class Scheduler:
         except Exception as e:
             _logger.error(f"Ошибка отправки напоминания активности user_id={user_id}: {e}")
 
-    async def _check_inactive_users_reminders(self, quiet_hours=None):
+    async def _check_inactive_users_reminders(self, quiet_hours: dict | None = None) -> None:
+        """Отправляет мотивационные напоминания давно неактивным пользователям."""
         user_ids = await get_inactive_users_for_reminder()
         if not user_ids:
             return
@@ -163,7 +191,8 @@ class Scheduler:
         coros = [self._send_inactive_reminder(uid) for uid in user_ids]
         await rate_limited_gather(coros)
 
-    async def _send_inactive_reminder(self, user_id):
+    async def _send_inactive_reminder(self, user_id: int) -> None:
+        """Отправляет напоминание неактивному пользователю и обновляет время последнего напоминания."""
         try:
             await self.bot.send_message(user_id, activity_inactive_reminder_msg)
             await update_last_inactivity_reminder(user_id)
@@ -171,7 +200,8 @@ class Scheduler:
         except Exception as e:
             _logger.error(f"Ошибка напоминания неактивному user_id={user_id}: {e}")
 
-    async def _check_sleep_reminders(self):
+    async def _check_sleep_reminders(self) -> None:
+        """Проверяет и рассылает напоминания об отбое и подъёме согласно расписанию каждого пользователя."""
         users = await get_users_for_sleep_reminders()
         for user_id, sleep_time_str, wake_time_str, tz, last_sleep_rem, last_wake_rem in users:
             tz = tz or 0
@@ -187,7 +217,8 @@ class Scheduler:
             sleep_window_start = (sleep_min - 35) % 1440
             sleep_window_end = (sleep_min - 5) % 1440
 
-            def _in_window(now_m, start_m, end_m):
+            def _in_window(now_m: int, start_m: int, end_m: int) -> bool:
+                """Проверяет, попадает ли текущее время (в минутах с начала дня) в заданное временнóе окно."""
                 if start_m <= end_m:
                     return start_m <= now_m <= end_m
                 else:  # перехлёст через полночь
@@ -218,7 +249,8 @@ class Scheduler:
                         _logger.error(f"Wake reminder error user_id={user_id}: {e}")
 
     @staticmethod
-    async def _check_weekly_water_reset():
+    async def _check_weekly_water_reset() -> None:
+        """Запускает еженедельный сброс водной статистики для пользователей, у которых наступил новый понедельник."""
         users = await fetch_water_stats_all()
         for user_id, goal_ml,timezone, Monday, Tuesday, \
                 Wednesday, Thursday, Friday, Saturday, Sunday, last_reset_str in users:
@@ -247,7 +279,8 @@ class Scheduler:
                 await Scheduler._weekly_water_reset(user_id, last_monday, lost_records)
 
     @staticmethod
-    async def _weekly_water_reset(user_id, last_monday, lost_records):
+    async def _weekly_water_reset(user_id: int, last_monday: Any, lost_records: int) -> None:
+        """Выполняет еженедельный сброс водной статистики: обновляет дату сброса, обнуляет недельные данные и восстанавливает потерянные записи."""
         try:
             # 1. Обновляем дату последнего сброса
             try:

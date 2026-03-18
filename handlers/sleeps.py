@@ -1,14 +1,24 @@
 from datetime import datetime
+from typing import Any
 
 from database import (
-    get_sleep_settings, get_open_sleep_session, get_last_sleep_log,
-    get_sleep_week_stats, get_sleep_history,
-    log_sleep_start, log_wake_up, get_user_time_now,
+    get_last_sleep_log,
+    get_open_sleep_session,
+    get_sleep_history,
+    get_sleep_settings,
+    get_sleep_week_stats,
+    get_user_time_now,
+    log_sleep_start,
+    log_wake_up,
 )
-from keyboards import sleep_dashboard_keyboard, sleep_not_set_keyboard
+from keyboards import sleep_dashboard_keyboard, sleep_not_set_keyboard, sleep_history_keyboard
 from messages import (
-    sleep_not_set_msg, sleep_dashboard_msg, sleep_log_start_msg,
-    sleep_log_end_msg, sleep_no_open_session_msg, sleep_history_msg,
+    sleep_dashboard_msg,
+    sleep_history_msg,
+    sleep_log_end_msg,
+    sleep_log_start_msg,
+    sleep_no_open_session_msg,
+    sleep_not_set_msg,
     sleep_too_soon_msg,
 )
 from utils.xp_helper import award_xp
@@ -16,7 +26,8 @@ from utils.xp_helper import award_xp
 MIN_SLEEP_MINUTES = 30  # минимальное время сна перед пробуждением
 
 
-async def sleeps_main(message, bot):
+async def sleeps_main(message: Any, bot: Any) -> None:
+    """Отображает дашборд трекера сна: текущее состояние, последнюю сессию и среднюю продолжительность."""
     user_id = message.chat.id
     settings = await get_sleep_settings(user_id)
     if not settings or (settings[0] is None and settings[1] is None):
@@ -49,7 +60,8 @@ async def sleeps_main(message, bot):
     )
 
 
-async def handle_sleep_log_start(call, bot):
+async def handle_sleep_log_start(call: Any, bot: Any) -> None:
+    """Отмечает начало сна и обновляет дашборд с кнопкой пробуждения."""
     user_id = call.message.chat.id
     now = await get_user_time_now(user_id)
     time_str = now.strftime('%H:%M')
@@ -62,7 +74,8 @@ async def handle_sleep_log_start(call, bot):
     )
 
 
-async def handle_sleep_log_end(call, bot):
+async def handle_sleep_log_end(call: Any, bot: Any) -> None:
+    """Отмечает пробуждение: проверяет минимальный срок сна и начисляет XP по качеству сна."""
     user_id = call.message.chat.id
     # Проверяем минимум 30 минут сна
     open_session = await get_open_sleep_session(user_id)
@@ -108,10 +121,11 @@ async def handle_sleep_log_end(call, bot):
         await award_xp(bot, user_id, 'sleep_short')
 
 
-async def handle_sleep_history(call, bot):
+async def handle_sleep_history(call: Any, bot: Any) -> None:
+    """Паказывает историю последних 7 сессий сна."""
     history = await get_sleep_history(call.message.chat.id, 7)
     await bot.edit_message_text(
         sleep_history_msg(history),
         call.message.chat.id, call.message.message_id,
-        reply_markup=sleep_dashboard_keyboard(False)
+        reply_markup=sleep_history_keyboard()
     )

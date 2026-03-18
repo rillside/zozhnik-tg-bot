@@ -1,10 +1,19 @@
 import asyncio
+from typing import Any
 
-from database import all_users, get_active_users_count, get_new_users_count, count_users_trackers, get_all_admin, get_user_full_stats
-from messages import adm_stats_msg, owner_stats_msg, user_stats_msg, user_nf
+from database import (
+    all_users,
+    count_users_trackers,
+    get_active_users_count,
+    get_all_admin,
+    get_new_users_count,
+    get_user_full_stats,
+)
+from messages import adm_stats_msg, owner_stats_msg, user_nf, user_stats_msg
 
 
-def case_of_numerals(number):
+def case_of_numerals(number: int) -> str:
+    """Возвращает число с правильным склонением слова 'пользователь'."""
     forms = (' пользователь', ' пользователя', ' пользователей')
     if number % 10 == 1 and number % 100 != 11:
         return str(number) + forms[0]  # 1, 21, 31, 101...
@@ -12,7 +21,8 @@ def case_of_numerals(number):
         return str(number) + forms[1]  # 2, 3, 4, 22, 23, 24...
     else:
         return str(number) + forms[2] # 5-20, 25-30, 35-40..
-async def adm_stats():
+async def adm_stats() -> str:
+    """Собирает и форматирует сводную статистику бота для администратора."""
     cnt_users = len(await all_users())
     active_cnt_users = await get_active_users_count()
     active_cnt_users_percent = round(active_cnt_users / cnt_users * 100) if cnt_users else 0
@@ -29,13 +39,14 @@ async def adm_stats():
                          water_track_cnt, activity_track_cnt, sleep_track_cnt)
 
 
-async def owner_stats():
+async def owner_stats() -> str:
+    """Собирает и форматирует статистику владельца со списком администраторов."""
     admins =  await get_all_admin()
     return await asyncio.to_thread(owner_stats_msg, admins)
 
 
-async def user_stats(user_id):
-    """Получает и форматирует статистику пользователя"""
+async def user_stats(user_id: int) -> str | None:
+    """Получает и форматирует статистику пользователя, возвращает None если данные не найдены."""
     stats = await get_user_full_stats(user_id)
     if not stats:
         return None

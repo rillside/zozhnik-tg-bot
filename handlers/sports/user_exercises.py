@@ -1,19 +1,51 @@
 from datetime import datetime
+from typing import Any
 
-from database import get_active_exercises, get_exercise_by_id, check_ex_is_favorite, remove_ex_from_favorite, \
-    add_ex_to_favorite, get_favorite_exercises, add_exercise_log, get_user_exercise_stats, \
-    get_user_exercise_stats_for_exercise, get_last_exercise_log, get_activity_goal_and_today_count
-from keyboards import sports_main_menu_keyboard, sports_category_keyboard, sports_difficulty_keyboard, \
-    sports_all_pagination_keyboard, sports_exercise_keyboard, sports_favorites_pagination_keyboard, \
-    cancel_any_keyboard, sports_confirm_done_keyboard
-from messages import sports_main_menu_msg, sports_category_msg, sports_difficulty_msg, sports_ex_list_msg, \
-    sports_exercise_details_msg, sports_not_found_ex_msg, sports_favorites_empty_msg, sports_favorites_header_msg, \
-    sports_my_stats_msg, sports_my_stats_empty_msg, sports_exercise_done_msg, sports_ex_stats_msg, \
-    sports_stats_top_item_msg, sports_confirm_done_msg, sports_done_too_soon_same_msg, sports_done_too_soon_other_msg
+from database import (
+    add_ex_to_favorite,
+    add_exercise_log,
+    check_ex_is_favorite,
+    get_active_exercises,
+    get_activity_goal_and_today_count,
+    get_exercise_by_id,
+    get_favorite_exercises,
+    get_last_exercise_log,
+    get_user_exercise_stats,
+    get_user_exercise_stats_for_exercise,
+    remove_ex_from_favorite,
+)
+from keyboards import (
+    cancel_any_keyboard,
+    sports_all_pagination_keyboard,
+    sports_category_keyboard,
+    sports_confirm_done_keyboard,
+    sports_difficulty_keyboard,
+    sports_exercise_keyboard,
+    sports_favorites_pagination_keyboard,
+    sports_main_menu_keyboard,
+)
+from messages import (
+    sports_category_msg,
+    sports_confirm_done_msg,
+    sports_difficulty_msg,
+    sports_done_too_soon_other_msg,
+    sports_done_too_soon_same_msg,
+    sports_ex_list_msg,
+    sports_ex_stats_msg,
+    sports_exercise_details_msg,
+    sports_exercise_done_msg,
+    sports_favorites_empty_msg,
+    sports_favorites_header_msg,
+    sports_main_menu_msg,
+    sports_my_stats_empty_msg,
+    sports_my_stats_msg,
+    sports_not_found_ex_msg,
+    sports_stats_top_item_msg,
+)
 from utils.xp_helper import award_xp
 
 
-def check_can_log_exercise(last_log, exercise_id):
+def check_can_log_exercise(last_log: tuple | None, exercise_id: int) -> tuple[bool, tuple | None]:
     """
     Логика проверки лимитов времени.
     - Одно и то же упражнение: не чаще раза в 15 минут.
@@ -43,7 +75,7 @@ def check_can_log_exercise(last_log, exercise_id):
     return True, None
 
 
-async def sports_start(message, bot, first_name=None):
+async def sports_start(message: Any, bot: Any, first_name: str | None = None) -> None:
     """
     Главное меню раздела Физ-активность. Вызывается:
     - при нажатии на кнопку "💪 Физ-активность" (после настройки)
@@ -58,7 +90,7 @@ async def sports_start(message, bot, first_name=None):
     )
 
 
-async def sports_check_all_start(call, bot):
+async def sports_check_all_start(call: Any, bot: Any) -> None:
     """
     Запускает просмотр всех упражнений.
     Отправляет пользователю сообщение с выбором категории.
@@ -71,7 +103,7 @@ async def sports_check_all_start(call, bot):
     )
 
 
-async def sports_handle_category(call, bot):
+async def sports_handle_category(call: Any, bot: Any) -> None:
     """
     Обрабатывает выбранную пользователем категорию.
     Отправляет сообщение с выбором уровня сложности.
@@ -88,7 +120,7 @@ async def sports_handle_category(call, bot):
     )
 
 
-async def sports_show_list(call, bot):
+async def sports_show_list(call: Any, bot: Any) -> None:
     """
        Показывает список упражнений с пагинацией.
        Обрабатывает:
@@ -117,7 +149,7 @@ async def sports_show_list(call, bot):
     )
 
 
-async def sports_show_exercise(call, bot):
+async def sports_show_exercise(call: Any, bot: Any) -> None:
     """
     Отображает детальную информацию об упражнении.
      Показывает название, описание, категорию, сложность,
@@ -138,7 +170,7 @@ async def sports_show_exercise(call, bot):
         call.message.message_id,
         reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty, has_video=bool(file_id))
     )
-async def toggle_favorite(call, bot):
+async def toggle_favorite(call: Any, bot: Any) -> None:
     """
     Переключает статус избранного для упражнения.
 
@@ -158,7 +190,7 @@ async def toggle_favorite(call, bot):
     await sports_show_exercise(call, bot)
 
 
-async def sports_check_favorites_start(call, bot):
+async def sports_check_favorites_start(call: Any, bot: Any) -> None:
     """
     Показывает список избранных упражнений пользователя.
     """
@@ -176,7 +208,7 @@ async def sports_check_favorites_start(call, bot):
     )
 
 
-async def sports_show_favorites_page(call, bot):
+async def sports_show_favorites_page(call: Any, bot: Any) -> None:
     """
     Обрабатывает переключение страниц в списке избранного.
     """
@@ -191,7 +223,7 @@ async def sports_show_favorites_page(call, bot):
     )
 
 
-async def sports_back_to_categories(call, bot):
+async def sports_back_to_categories(call: Any, bot: Any) -> None:
     """
     Возврат от выбора сложности к выбору категории.
     """
@@ -203,7 +235,7 @@ async def sports_back_to_categories(call, bot):
     )
 
 
-async def sports_back_to_main(call, bot):
+async def sports_back_to_main(call: Any, bot: Any) -> None:
     """
     Возврат в главное меню раздела Физ-активность.
     """
@@ -217,7 +249,7 @@ async def sports_back_to_main(call, bot):
     )
 
 
-async def sports_mark_done(call, bot):
+async def sports_mark_done(call: Any, bot: Any) -> None:
     """
     Показывает подтверждение выполнения упражнения.
     """
@@ -234,7 +266,7 @@ async def sports_mark_done(call, bot):
     )
 
 
-async def sports_confirm_done(call, bot):
+async def sports_confirm_done(call: Any, bot: Any) -> None:
     """
     Подтверждает выполнение: проверяет лимиты времени, добавляет запись.
     """
@@ -263,7 +295,7 @@ async def sports_confirm_done(call, bot):
         await award_xp(bot, user_id, 'exercise_goal')
 
 
-async def sports_cancel_done(call, bot):
+async def sports_cancel_done(call: Any, bot: Any) -> None:
     """
     Отмена подтверждения — возврат к карточке упражнения.
     """
@@ -272,7 +304,7 @@ async def sports_cancel_done(call, bot):
     await sports_show_exercise_for_ex_id(call, bot, ex_id)
 
 
-async def sports_show_exercise_for_ex_id(call, bot, ex_id):
+async def sports_show_exercise_for_ex_id(call: Any, bot: Any, ex_id: int) -> None:
     """Показывает карточку упражнения по ex_id (для возврата из подтверждения/отмены)."""
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
@@ -289,7 +321,7 @@ async def sports_show_exercise_for_ex_id(call, bot, ex_id):
     )
 
 
-async def sports_show_my_stats(call, bot):
+async def sports_show_my_stats(call: Any, bot: Any) -> None:
     """
     Показывает общую статистику пользователя по выполнению упражнений.
     """
@@ -313,7 +345,7 @@ async def sports_show_my_stats(call, bot):
         )
 
 
-async def sports_show_exercise_stats(call, bot):
+async def sports_show_exercise_stats(call: Any, bot: Any) -> None:
     """
     Показывает статистику по конкретному упражнению.
     """

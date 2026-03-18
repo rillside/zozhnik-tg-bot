@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any
 
 from database import get_user_full_stats
 from .client import ask_ollama
@@ -68,14 +69,11 @@ def _build_profile_text(stats: dict, first_name: str) -> str:
     return "\n".join(lines)
 
 
-async def ai_analyze_profile(call, bot):
+async def ai_analyze_profile(call: Any, bot: Any) -> None:
+    """Обрабатывает нажатие кнопки «🤖 ИИ-анализ профиля»: собирает статистику, вызывает Ollama и отправляет анализ."""
     if not ai_analyzer_enabled:
         await bot.answer_callback_query(call.id, ai_analyze_off_msg, show_alert=True)
         return
-    """
-    Callback-хендлер для кнопки «🤖 ИИ-анализ профиля».
-    Собирает статистику, вызывает Ollama и отправляет анализ.
-    """
     user_id = call.from_user.id
     first_name = call.from_user.first_name or "Пользователь"
 
@@ -103,14 +101,7 @@ async def ai_analyze_profile(call, bot):
     result = await ask_ollama(SYSTEM_PROMPT, profile_text)
 
     if result is None:
-        await bot.send_message(
-            user_id,
-            "❌ ИИ-анализ временно недоступен.\n\n"
-            "Убедитесь, что Ollama запущена:\n"
-            "ollama serve\n\n"
-            "И что модель загружена:\n"
-            "ollama pull gemma3:4b",
-        )
+        await bot.send_message(call.message.chat.id, ai_analyze_off_msg, show_alert=True)
     else:
         _logger.info(f"AI-анализ успешно выполнен для user_id={user_id}, символов: {len(result)}")
         await bot.send_message(user_id, result, parse_mode=None)

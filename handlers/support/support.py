@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from typing import Any
 
 from database import (
     add_ticket,
@@ -51,7 +52,8 @@ from utils.fsm import clear_state, set_state
 from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
-async def opening_ticket(message, bot, id_ticket, role):
+async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str) -> None:
+    """Открывает тикет для пользователя или админа: формирует историю сообщений и отправляет с клавиатурой действий."""
     max_char = 3800
     ticket_info, message_history = await load_info_by_ticket(id_ticket)
     id_ticket, title, user_id, username, first_name, status_for_user, status_for_admin, type_ticket, created_date, update_date = ticket_info
@@ -98,14 +100,16 @@ async def opening_ticket(message, bot, id_ticket, role):
         await replace_ticket_status(id_ticket, 'no_new', role)
     set_state(message.chat.id, 'waiting_send_msg_to_ticket', [id_ticket, role, last_msg, type_ticket, user_id])
 
-async def opening_photo_in_ticket(call, bot, msg_id):
+async def opening_photo_in_ticket(call: Any, bot: Any, msg_id: str) -> None:
+    """Отправляет фото из тикета с fallback-механизмом через канал хранения."""
     file_id, channel_message_id = await get_message_media_info(msg_id)
     if not file_id:
         await bot.answer_callback_query(call.id, 'Фото не найдено', show_alert=True)
         return
 
     # Используем fallback механизм
-    async def update_callback(new_file_id):
+    async def update_callback(new_file_id: str) -> None:
+        """Обновляет file_id сообщения тикета в БД после пересылки через канал."""
         await update_message_file_id(msg_id, new_file_id)
 
     await send_media_with_fallback(
@@ -117,7 +121,8 @@ async def opening_photo_in_ticket(call, bot, msg_id):
         reply_markup=cancel_media_keyboard(),
         update_callback=update_callback if channel_message_id else None
     )
-async def handle_delete_ticket(call, bot, type_handle):
+async def handle_delete_ticket(call: Any, bot: Any, type_handle: str) -> None:
+    """Диспетчер удаления тикета: запрос подтверждения, подтверждение или отмена."""
     await bot.delete_message(call.message.chat.id, call.message_id)
     if type_handle == 'delete':
         id_ticket = call.data.split('_')[2]
@@ -138,7 +143,8 @@ async def handle_delete_ticket(call, bot, type_handle):
         clear_state(call.message.chat.id)
 
 
-async def handling_aggressive_content(call, bot, content_type):
+async def handling_aggressive_content(call: Any, bot: Any, content_type: str) -> None:
+    """Обрабатывает подтверждение / отмену агрессивного заголовка или сообщения в тикете."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if content_type == 'title':
         if call.data.split('_')[2] == 'accept':
@@ -164,7 +170,8 @@ async def handling_aggressive_content(call, bot, content_type):
             await opening_ticket(call.message, bot, ticket_id, 'user')
 
 
-async def create_ticket(message, bot, type_ticket):
+async def create_ticket(message: Any, bot: Any, type_ticket: str) -> None:
+    """Создаёт новый тикет поддержки по заголовку из сообщения с проверкой цензуры."""
     if len(message.text) > 50:
         await bot.send_message(message.chat.id, ticket_limit_error_msg())
     else:
@@ -185,8 +192,10 @@ async def create_ticket(message, bot, type_ticket):
             )
 
 
-async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_ticket, user_id, type_msg='message',
-                                 file_id=None, caption=None):
+async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, role: str, last_msg: Any,
+                                 type_ticket: str, user_id: int, type_msg: str = 'message',
+                                 file_id: str | None = None, caption: str | None = None) -> None:
+    """Отправляет сообщение или фото в тикет: проверяет цензуру, сохраняет в БД и уведомляет собеседника."""
     try:
         await bot.delete_message(message.chat.id, message.message_id)
         await bot.delete_message(message.chat.id, last_msg.message_id)
@@ -245,7 +254,8 @@ async def send_message_to_ticket(message, bot, ticket_id, role, last_msg, type_t
     await opening_ticket(message, bot, ticket_id, role)
 
 
-async def ticket_exit(call, bot):
+async def ticket_exit(call: Any, bot: Any) -> None:
+    """Закрывает тикет и возвращает пользователя в список тикетов."""
     clear_state(call.message.chat.id)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     role = 'admin' if call.data.split('_')[-2] == 'admin' else 'user'
@@ -278,7 +288,8 @@ async def ticket_exit(call, bot):
             await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
 
 
-async def tickets_exit(call, bot):
+async def tickets_exit(call: Any, bot: Any) -> None:
+    """Закрывает список тикетов и возвращает на главный экран поддержки."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if call.data.split('_')[2] == 'user':
         await bot.send_message(call.message.chat.id, support_selection_msg(
@@ -293,7 +304,8 @@ async def tickets_exit(call, bot):
                                )
 
 
-async def look_ticket_page(call, bot):
+async def look_ticket_page(call: Any, bot: Any) -> None:
+    """Переходит на указанную страницу списка тикетов."""
     page, role = call.data.split('_')[2], call.data.split('_')[3]
     if role == 'admin':
         type = call.data.split('_')[4]
@@ -319,7 +331,8 @@ async def look_ticket_page(call, bot):
                                )
 
 
-async def admin_look_tickets(call, bot):
+async def admin_look_tickets(call: Any, bot: Any) -> None:
+    """Отображает список тикетов выбранного типа для админа."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     type_supp = call.data.split('_')[2]
     if await count_tickets_for_admin(type_supp):

@@ -1,7 +1,8 @@
 from datetime import datetime
 
 
-def sort_ticket(ticket):
+def sort_ticket(ticket: tuple) -> tuple:
+    """Ключ сортировки тикетов: непрочитанные первыми, затем от новых к старым."""
     status = ticket[2]
     date_str = ticket[3]
 

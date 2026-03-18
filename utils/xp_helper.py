@@ -1,7 +1,7 @@
 """Утилита для начисления XP и отправки уведомлений об этом."""
+from typing import Any
 from database import add_xp
-from messages import xp_gained_msg, level_up_msg
-
+from messages import level_up_msg, xp_gained_msg
 
 XP_ACTION_NAMES = {
     'water_add': 'добавление воды',
@@ -15,7 +15,7 @@ XP_ACTION_NAMES = {
 }
 
 
-async def award_xp(bot, user_id: int, action: str, silent: bool = False) -> dict:
+async def award_xp(bot: Any, user_id: int, action: str, silent: bool = False) -> dict:
     """
     Начисляет XP и отправляет сообщение пользователю.
     silent=True — не отправлять уведомление.

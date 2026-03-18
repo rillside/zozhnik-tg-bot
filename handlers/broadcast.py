@@ -2,18 +2,20 @@ from config import is_owner
 from database import all_users
 from keyboards import accept_send
 from messages import broadcast_stats
+from typing import Any
 from utils.censorship.checker import censor_check, removal_of_admin_rights
 from utils.fsm import clear_state, set_state
 from utils.rate_limit_send import rate_limited_gather
 import re
 
 
-def escape_md(text):
-    """Экранирует спецсимволы для обычного Markdown"""
+def escape_md(text: str) -> str:
+    """Экранирует спецсимволы для обычного Markdown."""""
     return re.sub(r'([_*`\[])', r'\\\1', str(text))
 
 
-async def accept_broadcast(message, bot, type_broadcast='msg', photo_id=None, caption=None):
+async def accept_broadcast(message: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
+    """Показывает предпросмотр рассылки и запрашивает подтверждение перед отправкой."""
     if type_broadcast == 'msg':
         if message.text.strip():
             await bot.send_message(message.chat.id, f"📋 Предпросмотр:\n{message.text}", reply_markup=accept_send())
@@ -26,7 +28,8 @@ async def accept_broadcast(message, bot, type_broadcast='msg', photo_id=None, ca
         set_state(message.chat.id, 'waiting_broadcast_accept', [photo_id, caption])
 
 
-async def broadcast_send(call, bot, type_broadcast='msg', photo_id=None, caption=None):
+async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
+    """Рассылает сообщение от админа всем пользователям с проверкой цензуры."""
     sender_id = call.message.chat.id
     sender_username = call.from_user.username
     sender = '@' + sender_username if sender_username is not None else sender_id

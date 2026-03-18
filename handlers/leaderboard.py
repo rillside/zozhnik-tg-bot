@@ -1,13 +1,11 @@
 from database import get_leaderboard, get_user_rank, get_user_xp
 from keyboards import leaderboard_keyboard, xp_profile_keyboard
 from messages import leaderboard_msg, profile_xp_msg
+from typing import Any
 
 
-async def show_leaderboard(source, bot):
-    """
-    source — message или call.message.
-    Показывает таблицу лидеров.
-    """
+async def show_leaderboard(source: Any, bot: Any) -> None:
+    """Показывает таблицу лидеров; source может быть message или call."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id
         send = lambda text, kb: bot.send_message(user_id, text, reply_markup=kb)
@@ -24,8 +22,8 @@ async def show_leaderboard(source, bot):
     await send(text, leaderboard_keyboard())
 
 
-async def show_xp_profile(source, bot):
-    """source — message или call."""
+async def show_xp_profile(source: Any, bot: Any) -> None:
+    """Показывает XP-профиль пользователя; source может быть message или call."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id
         first_name = source.from_user.first_name

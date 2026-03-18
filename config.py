@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 from database import get_user_status
 
 
-def load_owners():
+# Управление владельцами
+
+def load_owners() -> list:
+    """Загружает список ID владельцев из файла owners.json."""
     try:
         with open('owners.json', 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -15,6 +18,8 @@ def load_owners():
         with open('owners.json', 'w', encoding='utf-8') as f:
             json.dump([], f)
         return []
+
+# Конфигурация окружения
 
 load_dotenv()
 token = os.getenv('token_bot')  # Токен бота
@@ -34,15 +39,19 @@ except ValueError:
 owners = load_owners()
 owners_copy = owners[:]
 ai_censor_enabled = False
-ai_analyzer_enabled = False
+ai_analyzer_enabled = True
 censorship_threshold = 0.5 #Порог срабатывания AI цензуры
 
-def save_owners():
+def save_owners() -> None:
+    """Сохраняет текущий список владельцев в файл owners.json."""
     with open('owners.json', 'w', encoding='utf-8') as f:
         json.dump(owners, f, indent=2)
 
 
-async def is_admin(user_id=None, username=None):
+# Проверка прав доступа
+
+async def is_admin(user_id: int | None = None, username: str | None = None) -> bool | None:
+    """Проверяет, является ли пользователь администратором или владельцем."""
     if user_id:
         return await get_user_status(user_id=user_id) in ['Admin', 'Owner']
     elif username:
@@ -50,5 +59,6 @@ async def is_admin(user_id=None, username=None):
     return None
 
 
-def is_owner(user_id):
+def is_owner(user_id: int) -> bool:
+    """Проверяет, является ли пользователь владельцем бота."""
     return user_id in owners

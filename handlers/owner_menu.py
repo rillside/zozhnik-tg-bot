@@ -1,4 +1,5 @@
 import re
+from typing import Any
 from config import is_admin, owners_copy
 from database import is_user_valid, get_all_admin, get_user_status, \
     get_id_by_username, replace_status
@@ -11,7 +12,8 @@ from messages import  user_nf, user_already_admin, success_new_admin, owner_demo
 from utils.fsm import clear_state
 
 
-async def add_admin(msg, bot):
+async def add_admin(msg: Any, bot: Any) -> None:
+    """Обрабатывает ввод владельца: выдаёт права админа указанному пользователю (по ID или @username)."""
     if msg.text.strip().isdigit():
         clean_user_id = msg.text.strip()
         if await is_user_valid(user_id=clean_user_id):
@@ -48,7 +50,8 @@ async def add_admin(msg, bot):
 
 
 
-async def remove_admin(msg, bot):
+async def remove_admin(msg: Any, bot: Any) -> None:
+    """Обрабатывает ввод владельца: снимает права админа у указанного пользователя (по ID или @username)."""
     if msg.text.strip().isdigit():
         clean_user_id = msg.text.strip()
         if await is_user_valid(user_id=clean_user_id):
@@ -94,7 +97,8 @@ async def remove_admin(msg, bot):
             await bot.send_message(msg.chat.id, user_nf,reply_markup=own_cancel())
     else:
         await bot.send_message(msg.chat.id, incorrect_format_adm_msg,reply_markup=own_cancel())
-async def return_admin(call, bot):
+async def return_admin(call: Any, bot: Any) -> None:
+    """Восстанавливает права админа пользователю, лишённому их за нарушение цензуры."""
     user_id = int(re.search(r'ID Нарушителя: (\d+)', call.message.text).group(1))
     if user_id in owners_copy:
         await bot.send_message(call.message.chat.id, owner_unban)

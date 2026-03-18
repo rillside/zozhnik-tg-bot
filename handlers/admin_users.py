@@ -1,4 +1,5 @@
 """Управление пользователями для администраторов."""
+from typing import Any
 from database import search_user, replace_status, admin_set_xp, get_user_xp, get_user_rank
 from keyboards import user_profile_admin_keyboard, admin_search_cancel, admin_xp_cancel_keyboard
 from messages import (
@@ -8,7 +9,8 @@ from messages import (
 from utils.fsm import set_state, get_state, clear_state
 
 
-async def _safe_delete(bot, chat_id, msg_id):
+async def _safe_delete(bot: Any, chat_id: int, msg_id: int | None) -> None:
+    """Удаляет сообщение без исключений, игнорируя ошибки (msg_id None-safe)."""
     if not msg_id:
         return
     try:
@@ -17,7 +19,7 @@ async def _safe_delete(bot, chat_id, msg_id):
         pass
 
 
-async def _send_search_prompt(chat_id, bot):
+async def _send_search_prompt(chat_id: int, bot: Any) -> None:
     """Отправляет строку поиска и сохраняет msg_id в FSM."""
     sent = await bot.send_message(
         chat_id,
@@ -27,7 +29,7 @@ async def _send_search_prompt(chat_id, bot):
     set_state(chat_id, 'waiting_user_search', {'prompt_msg_id': sent.message_id})
 
 
-async def _show_user_profile_by_id(chat_id, user_id: int, bot):
+async def _show_user_profile_by_id(chat_id: int, user_id: int, bot: Any) -> None:
     """Загружает и отправляет карточку профиля по user_id."""
     row = await search_user(str(user_id))
     if not row:
@@ -40,7 +42,7 @@ async def _show_user_profile_by_id(chat_id, user_id: int, bot):
     await bot.send_message(chat_id, text, reply_markup=user_profile_admin_keyboard(uid, status))
 
 
-async def _show_user_profile_by_query(chat_id, query: str, bot):
+async def _show_user_profile_by_query(chat_id: int, query: str, bot: Any) -> None:
     """Ищет пользователя по запросу и показывает профиль. Если не найден — снова показывает поиск."""
     row = await search_user(query)
     if not row:
@@ -56,19 +58,19 @@ async def _show_user_profile_by_query(chat_id, query: str, bot):
 
 # ── Точки входа ──────────────────────────────────────────────────────────────
 
-async def admin_users_start(message, bot):
+async def admin_users_start(message: Any, bot: Any) -> None:
     """Кнопка «🔍 Пользователи» — показывает строку поиска."""
     await _send_search_prompt(message.chat.id, bot)
 
 
-async def admin_go_to_search(chat_id, bot, msg_to_delete_id=None):
+async def admin_go_to_search(chat_id: int, bot: Any, msg_to_delete_id: int | None = None) -> None:
     """Удаляет сообщение (если указано) и возвращает к строке поиска."""
     await _safe_delete(bot, chat_id, msg_to_delete_id)
     await _send_search_prompt(chat_id, bot)
 
 
-async def admin_user_search(message, bot):
-    """Обрабатывает введённый запрос и показывает профиль."""
+async def admin_user_search(message: Any, bot: Any) -> None:
+    """Обрабатывает введённый запрос и показывает профиль найденного пользователя."""
     _, data = get_state(message.chat.id)
     prompt_msg_id = data.get('prompt_msg_id') if data else None
     query = message.text.strip()
@@ -80,7 +82,7 @@ async def admin_user_search(message, bot):
 
 # ── Бан / Разбан ─────────────────────────────────────────────────────────────
 
-async def admin_ban_user(call, bot):
+async def admin_ban_user(call: Any, bot: Any) -> None:
     """Банит пользователя — обновляет карточку на месте."""
     user_id = int(call.data.split('_')[-1])
     row = await search_user(str(user_id))
@@ -112,7 +114,7 @@ async def admin_ban_user(call, bot):
     await bot.answer_callback_query(call.id, f"✅ {uid} заблокирован")
 
 
-async def admin_unban_user(call, bot):
+async def admin_unban_user(call: Any, bot: Any) -> None:
     """Разбанивает пользователя — обновляет карточку на месте."""
     user_id = int(call.data.split('_')[-1])
     row = await search_user(str(user_id))
@@ -143,7 +145,7 @@ async def admin_unban_user(call, bot):
 
 # ── XP ───────────────────────────────────────────────────────────────────────
 
-async def admin_xp_start(call, bot, action: str):
+async def admin_xp_start(call: Any, bot: Any, action: str) -> None:
     """Удаляет карточку профиля и запрашивает кол-во XP."""
     user_id = int(call.data.split('_')[-1])
     verb = "прибавить" if action == 'add' else "вычесть"
@@ -161,7 +163,7 @@ async def admin_xp_start(call, bot, action: str):
     await bot.answer_callback_query(call.id)
 
 
-async def admin_xp_cancel(call, bot):
+async def admin_xp_cancel(call: Any, bot: Any) -> None:
     """Отмена ввода XP — удаляет промпт и возвращает профиль пользователя."""
     user_id = int(call.data.split('_')[-1])
     clear_state(call.message.chat.id)
@@ -170,7 +172,7 @@ async def admin_xp_cancel(call, bot):
     await _show_user_profile_by_id(call.message.chat.id, user_id, bot)
 
 
-async def admin_xp_input(message, bot):
+async def admin_xp_input(message: Any, bot: Any) -> None:
     """Обрабатывает введённое количество XP."""
     _, data = get_state(message.chat.id)
     user_id = data['user_id']

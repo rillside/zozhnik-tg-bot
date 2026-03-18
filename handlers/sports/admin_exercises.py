@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 from database import (
     add_exercise_to_db,
@@ -67,10 +68,10 @@ from utils.fsm import clear_state, clear_state_keep_data, get_state, set_state
 from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
-def get_validated_data(user_id):
+def get_validated_data(user_id: int) -> dict | bool:
     """
     Проверяет наличие всех обязательных полей.
-    Возвращает кортеж значений, если все поля есть, иначе False
+    Возвращает кортеж значений, если все поля есть, иначе False.
     """
     data = get_state(user_id)[1]
     if isinstance(data, dict):
@@ -87,9 +88,9 @@ def get_validated_data(user_id):
     return name, description, category, difficulty, file_id, video_type
 
 
-async def validate_exercise_censorship(name, description):
+async def validate_exercise_censorship(name: str, description: str) -> bool:
     """
-    Проверяет все поля упражнения на цензуру параллельно
+    Проверяет все поля упражнения на цензуру параллельно.
     """
 
     # Запускаем проверки параллельно
@@ -103,7 +104,8 @@ async def validate_exercise_censorship(name, description):
     return True
 
 
-async def exercise_management(message, bot, first_name=None):
+async def exercise_management(message: Any, bot: Any, first_name: str | None = None) -> None:
+    """Отображает главное меню управления упражнениями для администратора."""
     first_name = first_name or message.from_user.first_name
     await bot.send_message(message.chat.id, admin_exercise_menu_msg(
         first_name),
@@ -111,7 +113,8 @@ async def exercise_management(message, bot, first_name=None):
                            )
 
 
-async def handle_exercise_accept(user_id, bot):
+async def handle_exercise_accept(user_id: int, bot: Any) -> bool:
+    """Показывает карточку подтверждения перед сохранением нового упражнения."""
     res = get_validated_data(user_id)
     if res:
         name, description, category, difficulty, file_id, _video_type = res
@@ -133,7 +136,8 @@ async def handle_exercise_accept(user_id, bot):
     return True
 
 
-async def save_exercise(user_id, username, bot):
+async def save_exercise(user_id: int, username: str | None, bot: Any) -> None:
+    """Сохраняет новое упражнение в базу данных после прохождения цензуры."""
     res = get_validated_data(user_id)
     if res:
         name, description, category, difficulty, file_id, video_type = get_validated_data(user_id)
@@ -156,8 +160,8 @@ async def save_exercise(user_id, username, bot):
         await bot.send_message(user_id, exercise_add_error)
 
 
-async def exercise_go_back(call, bot):
-    """Обработка кнопки Назад при добавлении упражнения"""
+async def exercise_go_back(call: Any, bot: Any) -> None:
+    """Обрабатывает нажатие кнопки «Назад» при пошаговом добавлении упражнения."""
     state, data = get_state(call.message.chat.id)
 
     if state != 'adding_exercise':
@@ -211,8 +215,8 @@ async def exercise_go_back(call, bot):
     )
 
 
-async def start_add_exercise(call, bot):
-    """Начать добавление упражнения"""
+async def start_add_exercise(call: Any, bot: Any) -> None:
+    """Запускает пошаговый процесс добавления нового упражнения."""
     set_state(call.message.chat.id, 'adding_exercise', {})
     await bot.send_message(call.message.chat.id,
                            exercise_request_name_msg,
@@ -220,8 +224,8 @@ async def start_add_exercise(call, bot):
                            )
 
 
-async def handle_exercise_name(message, bot):
-    """Обработка названия"""
+async def handle_exercise_name(message: Any, bot: Any) -> None:
+    """Обрабатывает ввод названия упражнения и сохраняет его в состояние."""
     state, data = get_state(message.chat.id)
     if await is_exercise_name_exists(message.text):
         await bot.send_message(
@@ -245,8 +249,8 @@ async def handle_exercise_name(message, bot):
                            )
 
 
-async def handle_exercise_description(message, bot):
-    """Обработка описания"""
+async def handle_exercise_description(message: Any, bot: Any) -> None:
+    """Обрабатывает ввод описания упражнения и сохраняет его в состояние."""
     state, data = get_state(message.chat.id)
 
     if len(message.text) < 20:
@@ -269,8 +273,8 @@ async def handle_exercise_description(message, bot):
                            reply_markup=ex_category_keyboard())
 
 
-async def handle_exercise_category(call, bot):
-    """Обработка категории"""
+async def handle_exercise_category(call: Any, bot: Any) -> None:
+    """Обрабатывает выбор категории упражнения и сохраняет его в состояние."""
     state, data = get_state(call.message.chat.id)
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
@@ -286,8 +290,8 @@ async def handle_exercise_category(call, bot):
     )
 
 
-async def handle_exercise_difficulty(call, bot):
-    """Обработка сложности"""
+async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
+    """Обрабатывает выбор уровня сложности упражнения и сохраняет его в состояние."""
     state, data = get_state(call.message.chat.id)
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
@@ -303,8 +307,8 @@ async def handle_exercise_difficulty(call, bot):
     )
 
 
-async def handle_exercise_video(message, bot):
-    """Обработка видео"""
+async def handle_exercise_video(message: Any, bot: Any) -> None:
+    """Обрабатывает загрузку видео к упражнению и переходит к подтверждению."""
     state, data = get_state(message.chat.id)
     file_id = message.video.file_id if message.video else message.animation.file_id
     data['video'] = file_id
@@ -313,8 +317,8 @@ async def handle_exercise_video(message, bot):
     await handle_exercise_accept(message.chat.id, bot)
 
 
-async def skip_exercise_video(call, bot):
-    """Обработка нажатия Пропустить при добавлении упражнения (видео необязательно)"""
+async def skip_exercise_video(call: Any, bot: Any) -> None:
+    """Пропускает шаг добавления видео при создании упражнения."""
     user_id = call.message.chat.id
     state, data = get_state(user_id)
     # Ожидаем, что пользователь на этапе добавления и выбрал сложность
@@ -330,7 +334,8 @@ async def skip_exercise_video(call, bot):
     await handle_exercise_accept(user_id, bot)
 
 
-async def open_video(call, bot, is_moment_of_creation=True):
+async def open_video(call: Any, bot: Any, is_moment_of_creation: bool = True) -> None:
+    """Отправляет видео упражнения пользователю: при создании или при редактировании существующего."""
     if is_moment_of_creation:
         res = get_validated_data(call.message.chat.id)
         if res:
@@ -351,7 +356,8 @@ async def open_video(call, bot, is_moment_of_creation=True):
 
     # Используем fallback механизм только для существующих упражнений
     if not is_moment_of_creation and channel_message_id:
-        async def update_callback(new_file_id):
+        async def update_callback(new_file_id: str) -> None:
+            """Обновляет file_id упражнения в БД после пересылки через канал."""
             await update_exercise_file_id(exercise_id, new_file_id)
 
         await send_media_with_fallback(
@@ -379,7 +385,8 @@ async def open_video(call, bot, is_moment_of_creation=True):
             )
 
 
-async def edit_exercise_start(call, bot):
+async def edit_exercise_start(call: Any, bot: Any) -> None:
+    """Запускает режим редактирования упражнений: предлагает выбрать категорию."""
     await bot.send_message(
         call.message.chat.id,
         edit_exercise_category_msg,
@@ -387,7 +394,8 @@ async def edit_exercise_start(call, bot):
     )
 
 
-async def edit_exercise_handle_category(call, bot):
+async def edit_exercise_handle_category(call: Any, bot: Any) -> None:
+    """Обрабатывает выбор категории при редактировании: предлагает выбрать сложность."""
     category = call.data.split('_')[-1]
     await bot.edit_message_text(
         edit_exercise_difficulty_msg,
@@ -397,7 +405,7 @@ async def edit_exercise_handle_category(call, bot):
     )
 
 
-async def edit_exercise_show_list(call, bot):
+async def edit_exercise_show_list(call: Any, bot: Any) -> None:
     """
     Показывает список упражнений для редактирования с пагинацией.
     Может вызываться:
@@ -442,7 +450,7 @@ async def edit_exercise_show_list(call, bot):
               )
 
 
-async def open_exercise_for_edit(bot, call=None, ex_id=None, message=None):
+async def open_exercise_for_edit(bot: Any, call: Any = None, ex_id: int | None = None, message: Any = None) -> None:
     """
     Открывает упражнение
     - из инлайн-кнопки.
@@ -479,7 +487,8 @@ async def open_exercise_for_edit(bot, call=None, ex_id=None, message=None):
     )
 
 
-async def handle_exercise_edit(call, bot):
+async def handle_exercise_edit(call: Any, bot: Any) -> None:
+    """Обрабатывает выбор поля для редактирования и переводит в соответствующее состояние."""
     user_id = call.message.chat.id
     ex_id, action = call.data.split('_')[3:]
     data = get_state(user_id)[-1]
@@ -518,7 +527,8 @@ async def handle_exercise_edit(call, bot):
               )
 
 
-async def save_exercise_changes(bot, message=None, call=None):
+async def save_exercise_changes(bot: Any, message: Any = None, call: Any = None) -> None:
+    """Сохраняет изменения конкретного поля упражнения в базу данных."""
     if message:
         user_id = message.chat.id
         message_id = message.message_id
@@ -609,7 +619,8 @@ async def save_exercise_changes(bot, message=None, call=None):
         await open_exercise_for_edit(bot, call=call, ex_id=ex_id)
     else:
         await open_exercise_for_edit(bot, message=message, ex_id=ex_id)
-async def accept_delete_exercise(call,bot):
+async def accept_delete_exercise(call: Any, bot: Any) -> None:
+    """Запрашивает подтверждение удаления упражнения."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     ex_id,category,difficulty = call.data.split('_')[3:]
     await bot.send_message(
@@ -617,7 +628,8 @@ async def accept_delete_exercise(call,bot):
         confirm_delete_exercise_msg(ex_id),
         reply_markup=ex_confirm_delete_keyboard(ex_id,category,difficulty)
     )
-async def delete_exercise(call,bot):
+async def delete_exercise(call: Any, bot: Any) -> None:
+    """Удаляет упражнение из базы данных после подтверждения."""
     await bot.answer_callback_query(call.id,exercise_deleted_msg)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     ex_id,category,difficulty = call.data.split('_')[3:]
@@ -627,7 +639,8 @@ async def delete_exercise(call,bot):
         await exercise_management(call.message,bot,call.from_user.first_name)
         return
     await edit_exercise_show_list(call,bot)
-async def cancel_delete_exercise(call,bot):
+async def cancel_delete_exercise(call: Any, bot: Any) -> None:
+    """Отменяет удаление упражнения и возвращает к его карточке."""
     await bot.answer_callback_query(call.id,cancellation)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     data = get_state(call.message.chat.id)[-1]
@@ -637,7 +650,8 @@ async def cancel_delete_exercise(call,bot):
     ex_id = call.data.split('_')[-3]
     await open_exercise_for_edit(bot,call=call,ex_id=ex_id)
 
-async def stats_exercise(call,bot):
+async def stats_exercise(call: Any, bot: Any) -> None:
+    """Показывает общую статистику упражнений для администратора."""
     stats = await get_exercise_stats()
     await bot.send_message(
         call.message.chat.id,
