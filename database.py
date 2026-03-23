@@ -44,9 +44,11 @@ async def init_db() -> None:
                 status TEXT,
                 timezone INTEGER,
                 created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_notification TIMESTAMP
             )
         ''')
+
 
         await conn.execute('''
                 CREATE TABLE IF NOT EXISTS track_water (
@@ -1171,8 +1173,11 @@ async def log_sleep_start(user_id: int) -> None:
         )
 
 
-async def log_wake_up(user_id: int) -> int | None:
-    """Закрывает активную сессию сна. Возвращает длительность в минутах или None."""
+MAX_SLEEP_MINUTES = 18 * 60  # лимит сна — 18 часов
+
+
+async def log_wake_up(user_id: int) -> tuple[int, bool] | None:
+    """Закрывает активную сессию сна. Возвращает (длительность в минутах, был_ли_лимит_18ч) или None."""
     now_user = await get_user_time_now(user_id)
     now_str = now_user.strftime('%Y-%m-%d %H:%M:%S')
     async with get_connection() as conn:
@@ -1197,11 +1202,15 @@ async def log_wake_up(user_id: int) -> int | None:
             await conn.execute('DELETE FROM sleep_logs WHERE id = ?', (log_id,))
             return None
         duration = int((now_user - sleep_start_dt).total_seconds() / 60)
+        capped = False
+        if duration > MAX_SLEEP_MINUTES:
+            duration = MAX_SLEEP_MINUTES
+            capped = True
         await conn.execute(
             'UPDATE sleep_logs SET wake_up = ?, duration = ? WHERE id = ?',
             (now_str, duration, log_id)
         )
-    return duration
+    return duration, capped
 
 
 async def get_open_sleep_session(user_id: int) -> tuple | None:
@@ -1250,16 +1259,42 @@ async def get_sleep_history(user_id: int, limit: int = 7) -> list[tuple]:
 
 
 async def get_users_for_sleep_reminders() -> list[tuple]:
-    """Пользователи с настроенными временами и включёнными напоминаниями."""
+    """Пользователи с настроенными временами и включёнными напоминаниями.
+    Возвращает: (user_id, sleep_time, wake_time, timezone, last_sleep_reminder, last_wake_reminder, last_notification)"""
     async with get_connection() as conn:
         cursor = await conn.execute(
-            '''SELECT user_id, sleep_time, wake_time, timezone,
-               last_sleep_reminder, last_wake_reminder
-               FROM track_sleep
-               WHERE sleep_time IS NOT NULL AND wake_time IS NOT NULL
-               AND reminders_enabled = 1'''
+            '''SELECT ts.user_id, ts.sleep_time, ts.wake_time, ts.timezone,
+               ts.last_sleep_reminder, ts.last_wake_reminder, u.last_notification
+               FROM track_sleep ts
+               JOIN users u ON ts.user_id = u.user_id
+               WHERE ts.sleep_time IS NOT NULL AND ts.wake_time IS NOT NULL
+               AND ts.reminders_enabled = 1'''
         )
         return await cursor.fetchall()
+
+
+async def get_last_notification(user_id: int) -> datetime | None:
+    """Возвращает время последнего уведомления пользователю или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            'SELECT last_notification FROM users WHERE user_id = ?', (user_id,)
+        )
+        row = await cursor.fetchone()
+    if row and row[0]:
+        try:
+            return datetime.fromisoformat(row[0][:19])
+        except Exception:
+            return None
+    return None
+
+
+async def update_last_notification(user_id: int) -> None:
+    """Обновляет время последнего уведомления пользователю."""
+    async with get_connection() as conn:
+        await conn.execute(
+            'UPDATE users SET last_notification = CURRENT_TIMESTAMP WHERE user_id = ?',
+            (user_id,)
+        )
 
 
 async def update_sleep_last_sleep_reminder(user_id: int) -> None:

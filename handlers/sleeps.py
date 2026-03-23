@@ -13,6 +13,7 @@ from database import (
 )
 from keyboards import sleep_dashboard_keyboard, sleep_not_set_keyboard, sleep_history_keyboard
 from messages import (
+    sleep_capped_msg,
     sleep_dashboard_msg,
     sleep_history_msg,
     sleep_log_end_msg,
@@ -102,16 +103,19 @@ async def handle_sleep_log_end(call: Any, bot: Any) -> None:
                 return
         except Exception:
             pass
-    duration = await log_wake_up(user_id)
-    if duration is None:
+    result = await log_wake_up(user_id)
+    if result is None:
         await bot.answer_callback_query(call.id, sleep_no_open_session_msg, show_alert=True)
         return
+    duration, capped = result
     await bot.answer_callback_query(call.id, "Пробуждение отмечено! ☀️", show_alert=False)
     await bot.edit_message_text(
         sleep_log_end_msg(duration),
         user_id, call.message.message_id,
         reply_markup=sleep_dashboard_keyboard(False)
     )
+    if capped:
+        await bot.send_message(user_id, sleep_capped_msg())
     # XP по качеству сна
     if duration >= 420:
         await award_xp(bot, user_id, 'sleep_good')

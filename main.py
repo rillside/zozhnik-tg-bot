@@ -205,9 +205,9 @@ class FakeMessage:
 
 def error_handler(func: Callable) -> Callable:
     """Декоратор для перехвата и логирования исключений в хэндлерах с отправкой пользователю сообщения об ошибке."""
-    @wraps
+    @wraps(func)
     async def wrapper(*args, **kwargs) -> Any:
-        """Внутреннее обёрточное функция декоратора: вызывает хэндлер и обрабатывает исключения."""
+        """Внутренняя обёрточная функция декоратора: вызывает хэндлер и обрабатывает исключения."""
         try:
             return await func(*args, **kwargs)
         except Exception as e:
@@ -440,7 +440,7 @@ async def msg(message: telebot.types.Message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: True)
-# @error_handler
+@error_handler
 async def callback_inline(call: telebot.types.CallbackQuery) -> None:
     """Диспетчер всех callback-запросов бота: разбирает call.data и вызывает соответствующий хэндлер."""
     if await is_user_banned(call.message.chat.id):
@@ -499,9 +499,11 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case 'review_settings':
             pass
         case 'timezone_settings':
+            await bot.answer_callback_query(call.id, show_alert=False)
+            await bot.delete_message(call.message.chat.id, call.message.message_id)
             await bot.send_message(call.message.chat.id,
                                    timezone_selection_msg(
-                                       call.message.from_user.first_name),
+                                       call.from_user.first_name),
                                    reply_markup=timezone_selection_keyboard()
                                    )
 
@@ -845,7 +847,7 @@ async def start_bot() -> None:
     while True:
         try:
             logging.info("Бот запущен")
-            await bot.polling(none_stop=True)
+            await bot.infinity_polling()
         except (ReadTimeout, ConnectionError, telebot.apihelper.ApiException) as e:
 
             logging.error(f"Произошла ошибка: {e}. Перезапуск через 15 секунд...")

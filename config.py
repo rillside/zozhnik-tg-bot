@@ -22,7 +22,7 @@ def load_owners() -> list:
 # Конфигурация окружения
 
 load_dotenv()
-token = os.getenv('token_bot')  # Токен бота
+token = os.getenv('TOKEN_BOT')  # Токен бота
 if not token:
     raise ValueError("BOT_TOKEN не найден в .env файле!")
 

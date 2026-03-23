@@ -40,6 +40,12 @@ async def select_timezone(call: Any, bot: Any) -> None:
             start_message(call.from_user.first_name),
             reply_markup=main_menu(call.message.chat.id,user_is_admin)
         )
+    else:
+        await bot.send_message(
+            call.message.chat.id,
+            settings_msg(call.from_user.first_name),
+            reply_markup=settings_keyboard()
+        )
 
 
 async def set_reminder_type_water(call: Any, bot: Any) -> None:

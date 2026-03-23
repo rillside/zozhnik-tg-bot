@@ -787,6 +787,20 @@ def sleep_dashboard_keyboard(is_sleeping: bool = False) -> types.InlineKeyboardM
     )
     return keyboard
 
+
+def sleep_bedtime_reminder_keyboard() -> types.InlineKeyboardMarkup:
+    """Клавиатура уведомления об отбое: кнопка «Ложусь спать»."""
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("😴 Ложусь спать", callback_data='sleep_log_start'))
+    return keyboard
+
+
+def sleep_wakeup_reminder_keyboard() -> types.InlineKeyboardMarkup:
+    """Клавиатура уведомления о подъёме: кнопка «Проснулся!»."""
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("☀️ Проснулся!", callback_data='sleep_log_end'))
+    return keyboard
+
 def sleep_history_keyboard() -> types.InlineKeyboardMarkup:
     """Кнопка закрытия истории сна."""
     keyboard = types.InlineKeyboardMarkup()
