@@ -648,9 +648,10 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case 'tech_supp_open_ticket' | 'consult_supp_open_ticket':
             type_supp = call.data.split('_')[0]
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
+            msg = await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
                                    reply_markup=supp_ticket_cancel_keyboard())
-            set_state(call.message.chat.id, 'waiting_ticket_title', type_supp)
+            set_state(call.message.chat.id, 'waiting_ticket_title',
+                      {'type_supp' : type_supp, 'msg_id' : msg.message_id})
         case 'back_to_main':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)

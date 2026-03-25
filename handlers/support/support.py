@@ -123,7 +123,7 @@ async def opening_photo_in_ticket(call: Any, bot: Any, msg_id: str) -> None:
     )
 async def handle_delete_ticket(call: Any, bot: Any, type_handle: str) -> None:
     """Диспетчер удаления тикета: запрос подтверждения, подтверждение или отмена."""
-    await bot.delete_message(call.message.chat.id, call.message_id)
+    await bot.delete_message(call.message.chat.id, call.message.message_id)
     if type_handle == 'delete':
         id_ticket = call.data.split('_')[2]
         await delete_ticket(id_ticket)
@@ -170,8 +170,14 @@ async def handling_aggressive_content(call: Any, bot: Any, content_type: str) ->
             await opening_ticket(call.message, bot, ticket_id, 'user')
 
 
-async def create_ticket(message: Any, bot: Any, type_ticket: str) -> None:
+async def create_ticket(message: Any, bot: Any, data: dict) -> None:
     """Создаёт новый тикет поддержки по заголовку из сообщения с проверкой цензуры."""
+    if data and data.get('msg_id'):
+        try:
+            await bot.delete_message(message.chat.id, data['msg_id'])
+        except:
+            pass
+    type_ticket = data.get('type_ticket')
     if len(message.text) > 50:
         await bot.send_message(message.chat.id, ticket_limit_error_msg())
     else:

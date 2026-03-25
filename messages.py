@@ -205,7 +205,7 @@ def broadcast_remove_adm_msg(user_id: int, owner_id: int) -> str:
 
 def settings_msg(first_name: str) -> str:
     """Главное сообщение раздела настроек."""
-    return f"""🔧 <b>Настройки напоминаний</b>
+    return f"""🔧 <b>Настройки</b>
 
 {first_name}, выбери категорию для настройки:
 
@@ -1180,12 +1180,12 @@ def wake_time_selection_msg(first_name: str) -> str:
 
 def sleep_time_set_msg(time_str: str) -> str:
     """Уведомление об установке времени отбоя."""
-    return f"🌙 Время отбоя установлено: <b>{time_str}</b>"
+    return f"🌙 Время отбоя установлено: {time_str}"
 
 
 def wake_time_set_msg(time_str: str) -> str:
     """Уведомление об установке времени подъёма."""
-    return f"☀️ Время подъёма установлено: <b>{time_str}</b>"
+    return f"☀️ Время подъёма установлено: {time_str}"
 
 
 def sleep_log_start_msg(time_str: str) -> str:
