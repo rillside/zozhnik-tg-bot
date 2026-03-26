@@ -1911,3 +1911,4 @@ def leaderboard_msg(rows: list, user_rank: int | None, user_xp: int, user_level:
     return "\n".join(lines)
 
 ai_analyze_off_msg = "❌ ИИ-анализ временно отключен."
+ai_analyze_error_msg = "❌ Во время анализа произошла ошибка"
