@@ -15,7 +15,7 @@ from database import (
     replace_ticket_status,
     send_supp_msg,
     tickets_by_user,
-    update_message_file_id,
+    update_message_file_id, set_lock_ticket_for_admins,
 )
 from handlers.admin_notifications import new_message_in_ticket_notify, new_ticket_notify
 from keyboards import (
@@ -45,7 +45,7 @@ from messages import (
     succ_ticket_title_msg,
     support_selection_msg,
     ticket_closed_msg,
-    ticket_limit_error_msg,
+    ticket_limit_error_msg, lock_ticket_msg,
 )
 from utils.censorship.checker import censor_check, removal_of_admin_rights
 from utils.fsm import clear_state, set_state
@@ -56,7 +56,7 @@ async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str
     """Открывает тикет для пользователя или админа: формирует историю сообщений и отправляет с клавиатурой действий."""
     max_char = 3800
     ticket_info, message_history = await load_info_by_ticket(id_ticket)
-    id_ticket, title, user_id, username, first_name, status_for_user, status_for_admin, type_ticket, created_date, update_date = ticket_info
+    id_ticket, title, user_id, username, first_name, status_for_user, status_for_admin, type_ticket,under_admin_review, _, created_date, update_date = ticket_info
     photos_id = await get_photo_ids_by_ticket(id_ticket)
     if not ticket_info:
         await bot.send_message(message.chat.id, error_ticket_opening_msg)
@@ -66,10 +66,16 @@ async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str
                                    message_history)
 
     else:
+        if under_admin_review not in (0, message.chat.id):
+            await bot.send_message(message.chat.id, lock_ticket_msg)
+            return
+        await set_lock_ticket_for_admins(id_ticket, message.chat.id)
         text_msg = admin_open_ticket_msg(id_ticket, title, user_id, username, first_name,
                                          status_for_admin,
                                          type_ticket, created_date,
                                          update_date, message_history)
+
+
 
     if len(text_msg) <= max_char:
         last_msg = await bot.send_message(message.chat.id,
@@ -177,7 +183,7 @@ async def create_ticket(message: Any, bot: Any, data: dict) -> None:
             await bot.delete_message(message.chat.id, data['msg_id'])
         except:
             pass
-    type_ticket = data.get('type_ticket')
+    type_ticket = data.get('type_supp')
     if len(message.text) > 50:
         await bot.send_message(message.chat.id, ticket_limit_error_msg())
     else:
@@ -189,6 +195,7 @@ async def create_ticket(message: Any, bot: Any, data: dict) -> None:
             await bot.send_message(message.chat.id, succ_ticket_title_msg,
                                    reply_markup=supp_ticket_draft_keyboard(id_ticket))
             await new_ticket_notify(bot, id_ticket, message.chat.id, type_ticket)
+            clear_state(message.chat.id)
 
         else:
             await bot.send_message(
@@ -283,7 +290,7 @@ async def ticket_exit(call: Any, bot: Any) -> None:
             await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
     else:
         type_supp = call.data.split('_')[-1]
-        if await count_tickets_for_admin(type_supp):
+        if await count_tickets_for_admin(type_supp,call.message.chat.id):
             await bot.send_message(call.message.chat.id
                                    , admin_tickets_msg(type_supp),
                                    reply_markup=
@@ -341,11 +348,11 @@ async def admin_look_tickets(call: Any, bot: Any) -> None:
     """Отображает список тикетов выбранного типа для админа."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     type_supp = call.data.split('_')[2]
-    if await count_tickets_for_admin(type_supp):
+    if await count_tickets_for_admin(type_supp,call.message.chat.id):
         await bot.send_message(call.message.chat.id
                                , admin_tickets_msg(type_supp),
                                reply_markup=
-                               opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp)
+                               opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp,user_id=call.message.chat.id)
                                                        ))
     else:
         await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)

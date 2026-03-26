@@ -142,6 +142,8 @@ async def init_db() -> None:
                 status_for_user TEXT DEFAULT 'no_new',
                 status_for_admin TEXT DEFAULT 'new',
                 type TEXT,
+                under_admin_review INTEGER DEFAULT 0,
+                opened_by_admin_at TIME DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -572,10 +574,10 @@ async def tickets_by_user(user_id: int) -> tuple | None:
     return result
 
 
-async def count_tickets_for_admin(type_ticket: str) -> int:
+async def count_tickets_for_admin(type_ticket: str, user_id : int) -> int:
     """Считает количество тикетов заданного типа."""
     async with get_connection() as conn:
-        cursor = await conn.execute('''SELECT COUNT(*) FROM tickets WHERE type = ?''', (type_ticket,))
+        cursor = await conn.execute('''SELECT COUNT(*) FROM tickets WHERE type = ? AND under_admin_review in (0,?)''', (type_ticket,user_id))
         result = await cursor.fetchone()
     return result[0] if result else 0
 
@@ -616,7 +618,7 @@ async def load_tickets_info(user_id: int | None = None, role: str = 'user', type
             await cursor.execute('''SELECT title,id,status_for_user,updated_at FROM tickets WHERE user_id = ?''',
                                  (user_id,))
         elif role == 'admin':
-            await cursor.execute('''SELECT title,id,status_for_admin,updated_at FROM tickets WHERE type = ?''', (type,))
+            await cursor.execute('''SELECT title,id,status_for_admin,updated_at FROM tickets WHERE type = ? AND under_admin_review in (0,?)''', (type,user_id))
         ticket_list = [list(row) for row in await cursor.fetchall()]
 
     return type, ticket_list
@@ -1468,3 +1470,9 @@ async def is_user_banned(user_id: int) -> bool:
         cursor = await conn.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
         row = await cursor.fetchone()
     return row is not None and row[0] == 'BANNED'
+
+
+async def set_lock_ticket_for_admins(ticket_id : int, user_id: int) -> None:
+    """Ставит lock на обращение, при его открытии, защищает от повторного открытия другим администратором"""
+    async with get_connection() as conn:
+        await conn.execute('UPDATE tickets SET under_admin_review = ? ,opened_by_admin_at = CURRENT_TIMESTAMP WHERE id = ?', (user_id,ticket_id,))
