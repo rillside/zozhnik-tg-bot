@@ -24,7 +24,7 @@ from messages import (
     water_custom_input_limit_msg,
     water_tracker_dashboard_msg,
 )
-from utils.fsm import clear_state, set_state
+from utils.fsm import State
 from utils.xp_helper import award_xp
 
 
@@ -84,9 +84,9 @@ async def handle_add_water(call: Any, bot: Any, step: str) -> None:
                              call.message.from_user.first_name),
                          reply_markup=cancel_custom_add_water_keyboard()
                          )
-        set_state(call.message.chat.id,'waiting_add_water',None)
+        State.set_state(call.message.chat.id,'waiting_add_water',None)
     elif step == 'custom_cancel':
-        clear_state(call.message.chat.id)
+        State.clear_state(call.message.chat.id)
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         current_goal, water_drunk = await water_stats(call.message.chat.id)
@@ -108,7 +108,7 @@ async def add_custom_water(message: Any, bot: Any) -> None:
                              reply_markup=
                              accept_custom_add_water_keyboard(ml)
                              )
-            clear_state(message.chat.id)
+            State.clear_state(message.chat.id)
             return
         else:
             await bot.send_message(message.chat.id, water_custom_input_limit_msg(ml),
@@ -118,3 +118,4 @@ async def add_custom_water(message: Any, bot: Any) -> None:
         await bot.send_message(message.chat.id, water_custom_input_format_error_msg,
                          reply_markup=cancel_custom_add_water_keyboard()
                          )
+

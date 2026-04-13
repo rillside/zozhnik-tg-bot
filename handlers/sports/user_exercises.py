@@ -158,7 +158,7 @@ async def sports_show_exercise(call: Any, bot: Any) -> None:
     ex_id = call.data.split('_')[-1]
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
-        await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
+        await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)
         return
     ex_name, description, category, difficulty = ex_info[1:5]
     file_id = ex_info[5]
@@ -256,7 +256,7 @@ async def sports_mark_done(call: Any, bot: Any) -> None:
     ex_id = call.data.split('_')[-1]
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
-        await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
+        await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)
         return
     await bot.edit_message_text(
         sports_confirm_done_msg,
@@ -274,7 +274,7 @@ async def sports_confirm_done(call: Any, bot: Any) -> None:
     user_id = call.message.chat.id
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
-        await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
+        await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)
         return
     last_log = await get_last_exercise_log(user_id)
     can_log, err = check_can_log_exercise(last_log, ex_id)
@@ -308,7 +308,7 @@ async def sports_show_exercise_for_ex_id(call: Any, bot: Any, ex_id: int) -> Non
     """Показывает карточку упражнения по ex_id (для возврата из подтверждения/отмены)."""
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
-        await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
+        await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)
         return
     ex_name, description, category, difficulty = ex_info[1:5]
     file_id = ex_info[5]
@@ -353,7 +353,7 @@ async def sports_show_exercise_stats(call: Any, bot: Any) -> None:
     user_id = call.message.chat.id
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
-        await bot.answer_callback_query(call.id, sports_not_found_ex_msg)
+        await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)
         return
     stats = await get_user_exercise_stats_for_exercise(user_id, ex_id)
     text = sports_ex_stats_msg(stats['total'], stats['weekly'])

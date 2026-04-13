@@ -6,7 +6,7 @@ from messages import (
     user_profile_admin_msg, admin_xp_change_success_msg,
     user_search_not_found_msg, user_banned_notify_msg, user_unbanned_notify_msg,
 )
-from utils.fsm import set_state, get_state, clear_state
+from utils.fsm import State
 
 
 async def _safe_delete(bot: Any, chat_id: int, msg_id: int | None) -> None:
@@ -26,7 +26,7 @@ async def _send_search_prompt(chat_id: int, bot: Any) -> None:
         "🔍 <b>Поиск пользователя</b>\n\nВведите ID или @username:",
         reply_markup=admin_search_cancel()
     )
-    set_state(chat_id, 'waiting_user_search', {'prompt_msg_id': sent.message_id})
+    State.set_state(chat_id, 'waiting_user_search', {'prompt_msg_id': sent.message_id})
 
 
 async def _show_user_profile_by_id(chat_id: int, user_id: int, bot: Any) -> None:
@@ -71,10 +71,10 @@ async def admin_go_to_search(chat_id: int, bot: Any, msg_to_delete_id: int | Non
 
 async def admin_user_search(message: Any, bot: Any) -> None:
     """Обрабатывает введённый запрос и показывает профиль найденного пользователя."""
-    _, data = get_state(message.chat.id)
+    _, data = State.get_state(message.chat.id)
     prompt_msg_id = data.get('prompt_msg_id') if data else None
     query = message.text.strip()
-    clear_state(message.chat.id)
+    State.clear_state(message.chat.id)
     # удаляем промпт поиска (бот-сообщение — можно удалить)
     await _safe_delete(bot, message.chat.id, prompt_msg_id)
     await _show_user_profile_by_query(message.chat.id, query, bot)
@@ -155,7 +155,7 @@ async def admin_xp_start(call: Any, bot: Any, action: str) -> None:
         f"✏️ Введите количество XP, которое нужно <b>{verb}</b> пользователю <code>{user_id}</code>:",
         reply_markup=admin_xp_cancel_keyboard(user_id)
     )
-    set_state(call.message.chat.id, 'waiting_admin_xp', {
+    State.set_state(call.message.chat.id, 'waiting_admin_xp', {
         'user_id': user_id,
         'action': action,
         'prompt_msg_id': sent.message_id,
@@ -166,7 +166,7 @@ async def admin_xp_start(call: Any, bot: Any, action: str) -> None:
 async def admin_xp_cancel(call: Any, bot: Any) -> None:
     """Отмена ввода XP — удаляет промпт и возвращает профиль пользователя."""
     user_id = int(call.data.split('_')[-1])
-    clear_state(call.message.chat.id)
+    State.clear_state(call.message.chat.id)
     await _safe_delete(bot, call.message.chat.id, call.message.message_id)
     await bot.answer_callback_query(call.id)
     await _show_user_profile_by_id(call.message.chat.id, user_id, bot)
@@ -174,7 +174,7 @@ async def admin_xp_cancel(call: Any, bot: Any) -> None:
 
 async def admin_xp_input(message: Any, bot: Any) -> None:
     """Обрабатывает введённое количество XP."""
-    _, data = get_state(message.chat.id)
+    _, data = State.get_state(message.chat.id)
     user_id = data['user_id']
     action = data['action']
     prompt_msg_id = data.get('prompt_msg_id')
@@ -184,7 +184,7 @@ async def admin_xp_input(message: Any, bot: Any) -> None:
         await bot.send_message(message.chat.id, "❌ Введите положительное целое число.")
         return
 
-    clear_state(message.chat.id)
+    State.clear_state(message.chat.id)
     amount = int(text)
     delta = amount if action == 'add' else -amount
     new_xp = await admin_set_xp(user_id, delta)
@@ -194,3 +194,4 @@ async def admin_xp_input(message: Any, bot: Any) -> None:
 
     await bot.send_message(message.chat.id, admin_xp_change_success_msg(user_id, delta, new_xp))
     await _show_user_profile_by_id(message.chat.id, user_id, bot)
+

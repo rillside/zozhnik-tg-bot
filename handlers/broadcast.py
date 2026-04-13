@@ -4,7 +4,7 @@ from keyboards import accept_send
 from messages import broadcast_stats
 from typing import Any
 from utils.censorship.checker import censor_check, removal_of_admin_rights
-from utils.fsm import clear_state, set_state
+from utils.fsm import State
 from utils.rate_limit_send import rate_limited_gather
 import re
 
@@ -25,7 +25,7 @@ async def accept_broadcast(message: Any, bot: Any, type_broadcast: str = 'msg', 
             photo=photo_id,
             caption=f"📋 Предпросмотр:\n{caption}", reply_markup=accept_send('photo')
         )
-        set_state(message.chat.id, 'waiting_broadcast_accept', [photo_id, caption])
+        State.set_state(message.chat.id, 'waiting_broadcast_accept', [photo_id, caption])
 
 
 async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
@@ -41,7 +41,7 @@ async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo
     safe_sender = escape_md(sender)
 
     if await censor_check(message):
-        clear_state(call.message.chat.id)
+        State.clear_state(call.message.chat.id)
         users = await all_users()
         if type_broadcast == 'msg':
             coros = [
@@ -66,3 +66,4 @@ async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo
         await bot.send_message(call.message.chat.id, broadcast_stats(succ, unsucc))
     else:
         await removal_of_admin_rights(bot, message, sender_id, sender_username, 'br')
+

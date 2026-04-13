@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import signal
 from functools import wraps
 from typing import Any, Callable
 
@@ -128,9 +129,7 @@ from keyboards import (
     activity_setup_keyboard,
     admin_exercise_keyboard,
     admin_menu,
-    admin_search_cancel,
     admin_ticket_section_keyboard,
-    cancel_any_keyboard,
     cancel_br_start,
     consultation_support_keyboard,
     get_water_interval_keyboard,
@@ -184,7 +183,7 @@ from messages import (
 )
 from utils.antispam import is_group_warned, mark_group_warned
 from utils.censorship.checker import censor_load
-from utils.fsm import clear_state, get_state, set_state, user_states
+from utils.fsm import State
 from utils.scheduler import Scheduler
 
 bot = AsyncTeleBot(token, parse_mode='HTML' )
@@ -232,7 +231,7 @@ def error_handler(func: Callable) -> Callable:
 # @error_handler
 async def start(message: telebot.types.Message) -> None:
     """Обрабатывает команду /start: регистрирует пользователя и показывает главное меню или выбор часового пояса."""
-    clear_state(message.chat.id)
+    State.clear_state(message.chat.id)
     user_is_admin = await is_admin(message.chat.id)
     if await is_user_banned(message.chat.id):
         await bot.send_message(message.chat.id, banned_msg)
@@ -260,13 +259,13 @@ async def start(message: telebot.types.Message) -> None:
                                )
 
 
-@bot.message_handler(content_types=['text'], func=lambda msg: user_states.get(msg.chat.id) is not None)
+@bot.message_handler(content_types=['text'], func=lambda msg: State.user_states.get(msg.chat.id) is not None)
 async def state_handler(message: telebot.types.Message) -> None:
     """Диспетчер текстовых сообщений в FSM-режиме: направляет входящий текст в нужный хэндлер по текущему состоянию."""
     if await is_user_banned(message.chat.id):
         await bot.send_message(message.chat.id, banned_msg)
         return
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
     match state:
         case 'waiting_broadcast_text':
             await accept_broadcast(message, bot)
@@ -306,10 +305,10 @@ async def state_handler(message: telebot.types.Message) -> None:
 _locks = {}
 
 
-@bot.message_handler(content_types=['photo'], func=lambda msg: user_states.get(msg.chat.id))
+@bot.message_handler(content_types=['photo'], func=lambda msg: State.user_states.get(msg.chat.id))
 async def handle_photo_with_state(message: telebot.types.Message) -> None:
     """Обрабатывает входящие фото в FSM-контексте: защищает от медиагрупп и направляет в нужный хэндлер."""
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
     async with _locks.setdefault(message.chat.id, asyncio.Lock()):
         if message.media_group_id:
             group_id = message.media_group_id
@@ -332,10 +331,10 @@ async def handle_photo_with_state(message: telebot.types.Message) -> None:
             await send_message_to_ticket(message, bot, *data, type_msg='photo', file_id=file_id, caption=caption)
 
 
-@bot.message_handler(content_types=['video', 'animation'], func=lambda msg: user_states.get(msg.chat.id))
+@bot.message_handler(content_types=['video', 'animation'], func=lambda msg: State.user_states.get(msg.chat.id))
 async def handle_video_with_state(message: telebot.types.Message) -> None:
     """Обрабатывает входящие видео и анимации в FSM-контексте: передаёт файл в хэндлер добавления/редактирования упражнений."""
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
     match state:
         case 'adding_exercise':
             if 'difficulty' in data:
@@ -416,7 +415,7 @@ async def msg(message: telebot.types.Message) -> None:
         case '📢 Рассылка' if await is_admin(message.chat.id):
             await bot.send_message(message.chat.id,
                                    example_broadcast, reply_markup=cancel_br_start())
-            set_state(message.chat.id, 'waiting_broadcast_text', None)
+            State.set_state(message.chat.id, 'waiting_broadcast_text', None)
         case '🔍 Пользователи' if await is_admin(message.chat.id):
             await admin_users_start(message, bot)
         case '💪 Управление упражнениями' if await is_admin(message.chat.id):
@@ -454,7 +453,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
             if type_broadcast == 'msg':
                 await broadcast_send(call, bot)
             elif type_broadcast == 'photo':
-                file_id, caption = get_state(call.message.chat.id)[1]
+                file_id, caption = State.get_state(call.message.chat.id)[1]
                 await broadcast_send(call, bot, 'photo', file_id, caption)
             elif type_broadcast == 'media_group':
                 pass
@@ -462,24 +461,24 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case 'br_cancel':
             await bot.send_message(call.message.chat.id, cancellation)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
         case 'add_adm':
             await bot.send_message(call.message.chat.id, add_new_adm_msg, reply_markup=own_cancel())
-            set_state(call.message.chat.id, 'waiting_admin_id', 'add')
+            State.set_state(call.message.chat.id, 'waiting_admin_id', 'add')
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'remove_adm':
             await bot.send_message(call.message.chat.id, remove_adm_msg, reply_markup=own_cancel())
-            set_state(call.message.chat.id, 'waiting_admin_id', 'remove')
+            State.set_state(call.message.chat.id, 'waiting_admin_id', 'remove')
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'own_cancel':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
             await bot.answer_callback_query(call.id, cancellation, show_alert=False)
             await bot.send_message(call.message.chat.id, await owner_stats(),
                                    reply_markup=owner_menu(await get_all_admin()))
         case 'br_start_cancel':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
             await bot.send_message(call.message.chat.id, cancellation)
         case 'return_adm':
             await return_admin(call, bot)
@@ -648,10 +647,9 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case 'tech_supp_open_ticket' | 'consult_supp_open_ticket':
             type_supp = call.data.split('_')[0]
             await bot.delete_message(call.message.chat.id, call.message.message_id)
-            msg = await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
+            await bot.send_message(call.message.chat.id, create_ticket_msg(type_supp),
                                    reply_markup=supp_ticket_cancel_keyboard())
-            set_state(call.message.chat.id, 'waiting_ticket_title',
-                      {'type_supp' : type_supp, 'msg_id' : msg.message_id})
+            State.set_state(call.message.chat.id, 'waiting_ticket_title', type_supp)
         case 'back_to_main':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             user_is_admin = await is_admin(call.message.chat.id)
@@ -659,7 +657,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
                                    reply_markup=main_menu(call.message.chat.id, user_is_admin))
         case data if data.startswith('accept_ticket_'):
             id_ticket = data.split('_')[2]
-            await bot.answer_callback_query(call.id, opening_ticket_msg)
+            await bot.answer_callback_query(call.id, opening_ticket_msg, show_alert=True)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await opening_ticket(call.message, bot, id_ticket, 'user')
         case data if data.startswith(('delete_ticket_',
@@ -682,7 +680,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
                                                          await load_tickets_info(call.message.chat.id))
                 )
             else:
-                await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
+                await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=True)
         case data if data.startswith('opening_photo_'):
             msg_id = data.split('_')[2]
             await opening_photo_in_ticket(call, bot, msg_id)
@@ -703,7 +701,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case data if data.startswith('open_ticket_'):
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             ticket_id, role = data.split('_')[2], data.split('_')[3]
-            await opening_ticket(call.message, bot, ticket_id, role)
+            await opening_ticket(call.message, bot, ticket_id, role, call=call)
 
         case 'supp_cancel_opening' | 'supp_ticket_exit':
             await bot.answer_callback_query(call.id, cancellation, show_alert=False)
@@ -713,7 +711,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
                                    reply_markup=support_selection_keyboard()
                                    )
         case 'cancel_media':
-            await bot.answer_callback_query(call.id, media_is_closed_msg, show_alert=False)
+            await bot.answer_callback_query(call.id, media_is_closed_msg, show_alert=True)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'admin_exercise_add':
             await start_add_exercise(call, bot)
@@ -728,14 +726,14 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case 'exercise_confirm_save':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await save_exercise(call.message.chat.id, call.message.from_user.username, bot)
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
         case 'add_exercise_back':
             await exercise_go_back(call, bot)
         case 'add_exercise_cancel':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await bot.send_message(call.message.chat.id, exercise_cancel_msg,
                                    reply_markup=admin_exercise_keyboard())
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
         case 'admin_exercise_edit' | 'edit_exercise_back_to_categories':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await edit_exercise_start(call, bot)
@@ -748,7 +746,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case data if data.startswith('edit_exercise_select_'):
             await open_exercise_for_edit(call=call, bot=bot)
         case 'edit_exercise_cancel':
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
             await exercise_management(call.message, bot, call.from_user.first_name)
         case data if data.startswith('ex_edit_open_video_'):
@@ -778,7 +776,7 @@ async def callback_inline(call: telebot.types.CallbackQuery) -> None:
         case data if data.startswith('adm_xp_cancel_'):
             await admin_xp_cancel(call, bot)
         case 'adm_search_cancel':
-            clear_state(call.message.chat.id)
+            State.clear_state(call.message.chat.id)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
         case 'cancel_any':
             await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -845,24 +843,60 @@ async def start_bot() -> None:
     reminder_service = Scheduler(bot)
     await reminder_service.start()
     await censor_load()
-    while True:
+
+    # Получаем текущий event loop для регистрации signal handler
+    loop = asyncio.get_event_loop()
+
+    # Функция для остановки бота
+    def stop_bot_handler():
+        logging.info('Получен сигнал выключения, завершаю работу бота...')
+        bot.stop_polling()
+
+    # Регистрируем обработчик сигналов через asyncio
+    try:
+        loop.add_signal_handler(signal.SIGINT, stop_bot_handler)
+        loop.add_signal_handler(signal.SIGTERM, stop_bot_handler)
+    except:
+        pass
+
+    try:
+        while True:
+            try:
+                logging.info("Бот запущен")
+                await bot.infinity_polling()
+                # Если polling завершился нормально (после stop_polling), выходим
+                break
+            except (ReadTimeout, ConnectionError, telebot.apihelper.ApiException) as e:
+                logging.error(f"Произошла ошибка: {e}. Перезапуск через 15 секунд...")
+                await asyncio.sleep(15)
+            except KeyboardInterrupt:
+                logging.info('Получен сигнал прерывания (KeyboardInterrupt)')
+                bot.stop_polling()
+                break
+    finally:
+        # Гарантированное закрытие ресурсов
+        logging.info('Остановка напоминаний...')
         try:
-            logging.info("Бот запущен")
-            await bot.infinity_polling()
-        except (ReadTimeout, ConnectionError, telebot.apihelper.ApiException) as e:
-
-            logging.error(f"Произошла ошибка: {e}. Перезапуск через 15 секунд...")
-            await asyncio.sleep(15)
-        except KeyboardInterrupt:
-            logging.info('Бот принудительно остановлен')
             await reminder_service.stop()
-            break
+        except Exception as e:
+            logging.error(f"Ошибка при остановке напоминаний: {e}")
 
-    # except Exception as e:
-    # logging.error(f"Непредвиденная ошибка: {e}. Перезапуск через 30 секунд...")
+        logging.info('Закрытие сессии бота...')
+        try:
+            # Закрыть aiohttp сессию
+            if hasattr(bot, 'session_manager') and bot.session_manager:
+                await bot.session_manager.session.close()
+        except Exception as e:
+            logging.error(f"Ошибка при закрытии сессии: {e}")
 
-    # await asyncio.sleep(30)
+        logging.info('Бот успешно остановлен')
 
 
 if __name__ == '__main__':
-    asyncio.run(start_bot())
+    try:
+        asyncio.run(start_bot())
+    except KeyboardInterrupt:
+        logging.info('Главный процесс прерван')
+    except Exception as e:
+        logging.error(f"Критическая ошибка при запуске: {e}", exc_info=True)
+

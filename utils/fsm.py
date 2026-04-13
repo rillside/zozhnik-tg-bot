@@ -1,42 +1,37 @@
 from typing import Any
 
-user_states: dict[int, dict] = {}
 
+class State:
+    """Конечного автомат для пользовательских состояний."""
 
-# Управление состояниями пользователей
+    user_states: dict[int, dict[str, Any]] = {}
 
-def set_state(user_id: int, state: str | None, data: Any) -> None:
-    """Устанавливает состояние и произвольные данные для пользователя."""
-    global user_states
-    if user_id not in user_states:
-        user_states[user_id] = {}
-    user_states[user_id]['state'] = state
-    user_states[user_id]['data'] = data
+    @classmethod
+    def set_state(cls, user_id: int, state: str | None, data: Any) -> None:
+        """Устанавливает состояние и произвольные данные для пользователя."""
+        if user_id not in cls.user_states:
+            cls.user_states[user_id] = {}
+        cls.user_states[user_id]["state"] = state
+        cls.user_states[user_id]["data"] = data
 
+    @classmethod
+    def clear_state(cls, user_id: int) -> None:
+        """Полностью удаляет состояние пользователя."""
+        if user_id in cls.user_states:
+            del cls.user_states[user_id]
 
-def clear_state(user_id: int) -> None:
-    """Полностью удаляет состояние пользователя."""
-    global user_states
-    if user_id not in user_states:
-        return
-    del user_states[user_id]
+    @classmethod
+    def clear_state_keep_data(cls, user_id: int) -> None:
+        """Сбрасывает состояние, оставляя сохраненные данные."""
+        if user_id not in cls.user_states:
+            return
+        data = cls.user_states[user_id].get("data")
+        cls.user_states[user_id] = {"state": None, "data": data}
 
-
-def clear_state_keep_data(user_id: int) -> None:
-    """Сбрасывает активное состояние, сохраняя сохранённые данные."""
-    global user_states
-    if user_id not in user_states:
-        return
-    # Сохраняем данные, удаляем состояние
-    data = user_states[user_id].get('data')
-    user_states[user_id] = {
-        'state': None,
-        'data': data
-    }
-
-
-def get_state(user_id: int) -> tuple[str | None, Any]:
-    """Возвращает пару (состояние, данные) для пользователя, или (None, None) если состояния нет."""
-    if user_id not in user_states:
-        return None, None
-    return user_states[user_id]['state'],user_states[user_id]['data']
+    @classmethod
+    def get_state(cls, user_id: int) -> tuple[str | None, Any]:
+        """Возвращает (state, data) для пользователя или (None, None)."""
+        if user_id not in cls.user_states:
+            return None, None
+        state_data = cls.user_states[user_id]
+        return state_data.get("state"), state_data.get("data")

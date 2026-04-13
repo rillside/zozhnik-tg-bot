@@ -334,16 +334,17 @@ def opening_ticket_keyboard(role: str, ticket_info: tuple, page: int = 1) -> typ
     last_ticket_in_page = page * 10 + 1
     keyboard = types.InlineKeyboardMarkup()
     for i in ticket_list[first_ticket_in_page:last_ticket_in_page]:
-        emoji = '🆕' if i[2] == 'new' else None
+        status = i.get('status_for_user') or i.get('status_for_admin')
+        emoji = '\U0001F195' if status == 'new' else None
         keyboard.row(
             types.InlineKeyboardButton(
-                f"{emoji if emoji else ''} {i[0]}",
-                callback_data=f'open_ticket_{i[1]}_{role}'))
+                f"{emoji if emoji else ''} {i.get('title', '')}",
+                callback_data=f"open_ticket_{i.get('id')}_{role}"))
     page_management_buttons = []
     if page > 1:
         page_management_buttons.append(
             types.InlineKeyboardButton(
-                '⬅️ Назад', callback_data=f'tickets_page_{page - 1}_{role}{'_' + type if role == 'admin' else ''}')
+                '⬅️ Назад', callback_data=f'tickets_page_{page - 1}_{role}' + (f'_{type}' if role == 'admin' and type else ''))
         )
     else:
         page_management_buttons.append(types.InlineKeyboardButton("🔙  Выйти", callback_data=f'tickets_exit_{role}'))
@@ -352,7 +353,7 @@ def opening_ticket_keyboard(role: str, ticket_info: tuple, page: int = 1) -> typ
     )
     if total_page > page:
         page_management_buttons.append(types.InlineKeyboardButton(
-            "▶️ Вперед", callback_data=f"tickets_page_{page + 1}_{role}{'_' + type if role == 'admin' else ''}")
+            "▶️ Вперед", callback_data=f"tickets_page_{page + 1}_{role}" + (f"_{type}" if role == 'admin' and type else ""))
         )
     keyboard.row(*page_management_buttons)
     return keyboard

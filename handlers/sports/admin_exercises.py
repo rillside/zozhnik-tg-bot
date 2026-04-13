@@ -9,7 +9,6 @@ from database import (
     get_exercise_stats,
     get_exercise_status,
     get_exercises_id_name,
-    get_file_id_by_ex_id,
     is_exercise_name_exists,
     update_exercise_file_id,
     update_exercise_in_db,
@@ -64,7 +63,7 @@ from messages import (
     step_back_msg,
 )
 from utils.censorship.checker import censor_check, removal_of_admin_rights
-from utils.fsm import clear_state, clear_state_keep_data, get_state, set_state
+from utils.fsm import State
 from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
@@ -73,7 +72,7 @@ def get_validated_data(user_id: int) -> dict | bool:
     Проверяет наличие всех обязательных полей.
     Возвращает кортеж значений, если все поля есть, иначе False.
     """
-    data = get_state(user_id)[1]
+    data = State.get_state(user_id)[1]
     if isinstance(data, dict):
         name = data.get('name')
         description = data.get('description')
@@ -162,10 +161,10 @@ async def save_exercise(user_id: int, username: str | None, bot: Any) -> None:
 
 async def exercise_go_back(call: Any, bot: Any) -> None:
     """Обрабатывает нажатие кнопки «Назад» при пошаговом добавлении упражнения."""
-    state, data = get_state(call.message.chat.id)
+    state, data = State.get_state(call.message.chat.id)
 
     if state != 'adding_exercise':
-        await bot.answer_callback_query(call.id, error_msg)
+        await bot.answer_callback_query(call.id, error_msg, show_alert=True)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         return
 
@@ -201,12 +200,12 @@ async def exercise_go_back(call: Any, bot: Any) -> None:
         keyboard = exercise_navigation_keyboard(step=1)
 
     else:
-        await bot.answer_callback_query(call.id, error_msg)
+        await bot.answer_callback_query(call.id, error_msg, show_alert=True)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
         return
 
-    set_state(call.message.chat.id, 'adding_exercise', data)
-    await bot.answer_callback_query(call.id, step_back_msg)
+    State.set_state(call.message.chat.id, 'adding_exercise', data)
+    await bot.answer_callback_query(call.id, step_back_msg, show_alert=True)
     await bot.edit_message_text(
         text,
         call.message.chat.id,
@@ -217,7 +216,7 @@ async def exercise_go_back(call: Any, bot: Any) -> None:
 
 async def start_add_exercise(call: Any, bot: Any) -> None:
     """Запускает пошаговый процесс добавления нового упражнения."""
-    set_state(call.message.chat.id, 'adding_exercise', {})
+    State.set_state(call.message.chat.id, 'adding_exercise', {})
     await bot.send_message(call.message.chat.id,
                            exercise_request_name_msg,
                            reply_markup=exercise_navigation_keyboard(step=1)
@@ -226,7 +225,7 @@ async def start_add_exercise(call: Any, bot: Any) -> None:
 
 async def handle_exercise_name(message: Any, bot: Any) -> None:
     """Обрабатывает ввод названия упражнения и сохраняет его в состояние."""
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
     if await is_exercise_name_exists(message.text):
         await bot.send_message(
             message.chat.id,
@@ -241,7 +240,7 @@ async def handle_exercise_name(message: Any, bot: Any) -> None:
         return
 
     data['name'] = message.text
-    set_state(message.chat.id, 'adding_exercise', data)
+    State.set_state(message.chat.id, 'adding_exercise', data)
 
     await bot.send_message(message.chat.id,
                            exercise_request_description_msg,
@@ -251,7 +250,7 @@ async def handle_exercise_name(message: Any, bot: Any) -> None:
 
 async def handle_exercise_description(message: Any, bot: Any) -> None:
     """Обрабатывает ввод описания упражнения и сохраняет его в состояние."""
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
 
     if len(message.text) < 20:
         await bot.send_message(message.chat.id,
@@ -266,7 +265,7 @@ async def handle_exercise_description(message: Any, bot: Any) -> None:
         return
 
     data['description'] = message.text
-    set_state(message.chat.id, 'adding_exercise', data)
+    State.set_state(message.chat.id, 'adding_exercise', data)
 
     await bot.send_message(message.chat.id,
                            exercise_request_category_msg,
@@ -275,12 +274,12 @@ async def handle_exercise_description(message: Any, bot: Any) -> None:
 
 async def handle_exercise_category(call: Any, bot: Any) -> None:
     """Обрабатывает выбор категории упражнения и сохраняет его в состояние."""
-    state, data = get_state(call.message.chat.id)
+    state, data = State.get_state(call.message.chat.id)
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
         return
     data['category'] = call.data.split('_')[-1]  # например 'strength'
-    set_state(call.message.chat.id, 'adding_exercise', data)
+    State.set_state(call.message.chat.id, 'adding_exercise', data)
 
     await bot.edit_message_text(
         exercise_request_difficulty_msg,
@@ -292,12 +291,12 @@ async def handle_exercise_category(call: Any, bot: Any) -> None:
 
 async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
     """Обрабатывает выбор уровня сложности упражнения и сохраняет его в состояние."""
-    state, data = get_state(call.message.chat.id)
+    state, data = State.get_state(call.message.chat.id)
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
         return
     data['difficulty'] = call.data.split('_')[-1]  # например 'beginner'
-    set_state(call.message.chat.id, 'adding_exercise', data)
+    State.set_state(call.message.chat.id, 'adding_exercise', data)
 
     await bot.edit_message_text(
         exercise_request_video_msg,
@@ -309,24 +308,24 @@ async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
 
 async def handle_exercise_video(message: Any, bot: Any) -> None:
     """Обрабатывает загрузку видео к упражнению и переходит к подтверждению."""
-    state, data = get_state(message.chat.id)
+    state, data = State.get_state(message.chat.id)
     file_id = message.video.file_id if message.video else message.animation.file_id
     data['video'] = file_id
     data['video_type'] = 'video' if message.video else 'animation'
-    clear_state_keep_data(message.chat.id)
+    State.clear_state_keep_data(message.chat.id)
     await handle_exercise_accept(message.chat.id, bot)
 
 
 async def skip_exercise_video(call: Any, bot: Any) -> None:
     """Пропускает шаг добавления видео при создании упражнения."""
     user_id = call.message.chat.id
-    state, data = get_state(user_id)
+    state, data = State.get_state(user_id)
     # Ожидаем, что пользователь на этапе добавления и выбрал сложность
     if state != 'adding_exercise' or 'difficulty' not in data:
-        await bot.answer_callback_query(call.id, error_msg)
+        await bot.answer_callback_query(call.id, error_msg, show_alert=True)
         return
     data.pop('video', None)
-    set_state(user_id, 'adding_exercise', data)
+    State.set_state(user_id, 'adding_exercise', data)
     try:
         await bot.delete_message(user_id, call.message.message_id)
     except:
@@ -441,7 +440,7 @@ async def edit_exercise_show_list(call: Any, bot: Any) -> None:
     except:
         await bot.send_message(call.message.chat.id,text,
                                reply_markup=keyboard)
-    set_state(call.message.chat.id,'exercise_editing_menu',{
+    State.set_state(call.message.chat.id,'exercise_editing_menu',{
         'ui_context' : {
             'category':category,
             'difficulty':difficulty
@@ -463,8 +462,8 @@ async def open_exercise_for_edit(bot: Any, call: Any = None, ex_id: int | None =
     else:
         user_id = call.message.chat.id
         message_id = call.message.message_id
-    clear_state_keep_data(user_id)
-    data = get_state(user_id)[-1]
+    State.clear_state_keep_data(user_id)
+    data = State.get_state(user_id)[-1]
     if not data or not data.get("ui_context"):
         await bot.send_message(user_id,exercise_edit_error_msg)
         return
@@ -491,7 +490,7 @@ async def handle_exercise_edit(call: Any, bot: Any) -> None:
     """Обрабатывает выбор поля для редактирования и переводит в соответствующее состояние."""
     user_id = call.message.chat.id
     ex_id, action = call.data.split('_')[3:]
-    data = get_state(user_id)[-1]
+    data = State.get_state(user_id)[-1]
     if not data or not data.get("ui_context"):
         await bot.send_message(user_id, exercise_edit_error_msg)
         return
@@ -519,11 +518,11 @@ async def handle_exercise_edit(call: Any, bot: Any) -> None:
             return
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     sent_msg = await bot.send_message(user_id, text, reply_markup=keyboard)
-    state,data = get_state(user_id)
+    state,data = State.get_state(user_id)
     data['ex_id'] = ex_id
     data['action'] = action
     data['prompt_msg_id'] = sent_msg.message_id
-    set_state(user_id, 'waiting_new_exercise_field', data
+    State.set_state(user_id, 'waiting_new_exercise_field', data
               )
 
 
@@ -535,7 +534,7 @@ async def save_exercise_changes(bot: Any, message: Any = None, call: Any = None)
     else:
         user_id = call.message.chat.id
         message_id = call.message.message_id
-    state, data = get_state(user_id)
+    state, data = State.get_state(user_id)
     if state != 'waiting_new_exercise_field':
         await bot.send_message(user_id, error_msg)
         return
@@ -634,7 +633,7 @@ async def delete_exercise(call: Any, bot: Any) -> None:
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     ex_id,category,difficulty = call.data.split('_')[3:]
     await delete_exercise_in_db(ex_id)
-    data = get_state(call.message.chat.id)[-1]
+    data = State.get_state(call.message.chat.id)[-1]
     if not data or not data.get("ui_context"):
         await exercise_management(call.message,bot,call.from_user.first_name)
         return
@@ -643,7 +642,7 @@ async def cancel_delete_exercise(call: Any, bot: Any) -> None:
     """Отменяет удаление упражнения и возвращает к его карточке."""
     await bot.answer_callback_query(call.id,cancellation)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
-    data = get_state(call.message.chat.id)[-1]
+    data = State.get_state(call.message.chat.id)[-1]
     if not data or not data.get("ui_context"):
         await exercise_management(call.message,bot,call.from_user.first_name)
         return
@@ -658,3 +657,4 @@ async def stats_exercise(call: Any, bot: Any) -> None:
         exercise_stats_msg(stats),
         reply_markup=cancel_any_keyboard()
     )
+

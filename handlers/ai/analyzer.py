@@ -6,7 +6,7 @@ from database import get_user_full_stats
 from .client import ask_ollama
 from .promts import SYSTEM_PROMPT
 from config import ai_analyzer_enabled
-from messages import ai_analyze_off_msg, ai_analyze_error_msg
+from messages import ai_analyze_off_msg
 
 _logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def _build_profile_text(stats: dict, first_name: str) -> str:
 
 
 async def ai_analyze_profile(call: Any, bot: Any) -> None:
-    """Обрабатывает нажатие кнопки «🤖 ИИ-анализ профиля»: собирает статистику, вызывает Ollama и отправляет анализ."""
+    """Обрабатывает нажатие кнопки «ИИ-анализ профиля»: собирает статистику, вызывает Ollama и отправляет анализ."""
     if not ai_analyzer_enabled:
         await bot.answer_callback_query(call.id, ai_analyze_off_msg, show_alert=True)
         return
@@ -101,7 +101,7 @@ async def ai_analyze_profile(call: Any, bot: Any) -> None:
     result = await ask_ollama(SYSTEM_PROMPT, profile_text)
 
     if result is None:
-        await bot.send_message(call.message.chat.id, ai_analyze_error_msg)
+        await bot.send_message(call.message.chat.id, ai_analyze_off_msg, show_alert=True)
     else:
         _logger.info(f"AI-анализ успешно выполнен для user_id={user_id}, символов: {len(result)}")
         await bot.send_message(user_id, result, parse_mode=None)

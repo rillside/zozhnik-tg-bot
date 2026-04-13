@@ -205,7 +205,7 @@ def broadcast_remove_adm_msg(user_id: int, owner_id: int) -> str:
 
 def settings_msg(first_name: str) -> str:
     """Главное сообщение раздела настроек."""
-    return f"""🔧 <b>Настройки</b>
+    return f"""🔧 <b>Настройки напоминаний</b>
 
 {first_name}, выбери категорию для настройки:
 
@@ -504,7 +504,10 @@ def open_ticket_msg(ticket_id: int, title: str, type_ticket: str, created_date: 
 """
     if messages_history:
 
-        for is_from_user, text, type_msg, file_id in messages_history:
+        for msg_data in messages_history:
+            is_from_user = msg_data['is_from_user']
+            text = msg_data['text']
+            type_msg = msg_data['type_msg']
             sender = "👤 Вы:" if is_from_user else "🛠️ Админ:"
             if type_msg == 'photo':
                 cnt_photo += 1
@@ -554,7 +557,10 @@ def admin_open_ticket_msg(ticket_id: int, title: str, user_id: int, username: st
 
     # История сообщений
     if messages_history:
-        for i, (is_from_user, text, type_msg, file_id) in enumerate(messages_history, 1):
+        for i, msg_data in enumerate(messages_history, 1):
+            is_from_user = msg_data['is_from_user']
+            text = msg_data['text']
+            type_msg = msg_data['type_msg']
             prefix = "👤 Пользователь:" if is_from_user else "🛠️ Администратор:"
             if type_msg == 'photo':
                 cnt_photo += 1
@@ -1180,12 +1186,12 @@ def wake_time_selection_msg(first_name: str) -> str:
 
 def sleep_time_set_msg(time_str: str) -> str:
     """Уведомление об установке времени отбоя."""
-    return f"🌙 Время отбоя установлено: {time_str}"
+    return f"🌙 Время отбоя установлено: <b>{time_str}</b>"
 
 
 def wake_time_set_msg(time_str: str) -> str:
     """Уведомление об установке времени подъёма."""
-    return f"☀️ Время подъёма установлено: {time_str}"
+    return f"☀️ Время подъёма установлено: <b>{time_str}</b>"
 
 
 def sleep_log_start_msg(time_str: str) -> str:
@@ -1532,7 +1538,8 @@ my_tickets_msg = """📋 Мои обращения
 Выберите обращение:"""
 succ_send_msg = "✅ Сообщение отправлено!"
 error_ticket_opening_msg = "❌ Произошла ошибка. Видимо Обращение закрыто."
-lock_ticket_msg = "❌ Произошла ошибка. Обращение уже просматривается другим администратором."
+ticket_locked_by_other_admin_msg = "Ошибка: обращение уже открыто другим администратором."
+
 # Шаг 1 - запрос названия
 exercise_request_name_msg = """📝 Добавление упражнения - шаг 1/5
 
@@ -1911,4 +1918,4 @@ def leaderboard_msg(rows: list, user_rank: int | None, user_xp: int, user_level:
     return "\n".join(lines)
 
 ai_analyze_off_msg = "❌ ИИ-анализ временно отключен."
-ai_analyze_error_msg = "❌ Во время анализа произошла ошибка"
+

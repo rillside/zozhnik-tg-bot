@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, AsyncGenerator
@@ -565,32 +565,48 @@ async def send_supp_msg(ticket_id: int, text: str | None, is_from_user: bool,
                            (ticket_id,))
 
 
-async def tickets_by_user(user_id: int) -> tuple | None:
+async def tickets_by_user(user_id: int) -> dict[str, Any] | None:
     """Возвращает первый тикет пользователя или None, если тикетовнет."""
     async with get_connection() as conn:
         cursor = await conn.execute(
             'SELECT id,status_for_user,type,created_at,updated_at FROM tickets WHERE user_id = ?', (user_id,))
-        result = await cursor.fetchone()
-    return result
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        columns = [column[0] for column in cursor.description]
+    return dict(zip(columns, row))
 
 
-async def count_tickets_for_admin(type_ticket: str, user_id : int) -> int:
+async def count_tickets_for_admin(type_ticket: str) -> int:
     """Считает количество тикетов заданного типа."""
     async with get_connection() as conn:
-        cursor = await conn.execute('''SELECT COUNT(*) FROM tickets WHERE type = ? AND under_admin_review in (0,?)''', (type_ticket,user_id))
+        cursor = await conn.execute(
+            '''SELECT COUNT(*) FROM tickets
+               WHERE type = ? AND (under_admin_review IS NULL OR under_admin_review = 0)''',
+            (type_ticket,)
+        )
         result = await cursor.fetchone()
     return result[0] if result else 0
 
 
-async def load_info_by_ticket(ticket_id: int) -> tuple[tuple, list]:
-    """Возвращает (ticket_info, список сообщений) для тикета."""
+async def load_info_by_ticket(ticket_id: int) -> tuple[dict[str, Any] | None, list]:
+    """Return (ticket_info, messages) for a ticket.
+
+    `ticket_info` is returned as a dict with named columns from `tickets`.
+    """
     async with get_connection() as conn:
         cursor = await conn.cursor()
         await cursor.execute('''SELECT * FROM tickets WHERE id = ?''', (ticket_id,))
-        ticket_info = await cursor.fetchone()
+        ticket_row = await cursor.fetchone()
+        ticket_info = None
+        if ticket_row:
+            columns = [column[0] for column in cursor.description]
+            ticket_info = dict(zip(columns, ticket_row))
         await cursor.execute('''SELECT is_from_user,text,type_msg,file_id FROM messages WHERE ticket_id = ?''',
                              (ticket_id,))
-        message_info = await cursor.fetchall()
+        message_rows = await cursor.fetchall()
+        columns = [column[0] for column in cursor.description] if cursor.description else []
+        message_info = [dict(zip(columns, row)) for row in message_rows]
     return ticket_info, message_info
 
 
@@ -610,7 +626,8 @@ async def get_photo_file_id(msg_id: int) -> str | None:
         return result[0] if result else None
 
 
-async def load_tickets_info(user_id: int | None = None, role: str = 'user', type: str | None = None) -> tuple:
+async def load_tickets_info(user_id: int | None = None, role: str = 'user',
+                            type: str | None = None) -> tuple[str | None, list[dict[str, Any]]]:
     """Возвращает (type, список тикетов) для пользователя или админа."""
     async with get_connection() as conn:
         cursor = await conn.cursor()
@@ -618,8 +635,14 @@ async def load_tickets_info(user_id: int | None = None, role: str = 'user', type
             await cursor.execute('''SELECT title,id,status_for_user,updated_at FROM tickets WHERE user_id = ?''',
                                  (user_id,))
         elif role == 'admin':
-            await cursor.execute('''SELECT title,id,status_for_admin,updated_at FROM tickets WHERE type = ? AND under_admin_review in (0,?)''', (type,user_id))
-        ticket_list = [list(row) for row in await cursor.fetchall()]
+            await cursor.execute(
+                '''SELECT title,id,status_for_admin,updated_at FROM tickets
+                   WHERE type = ? AND (under_admin_review IS NULL OR under_admin_review = 0)''',
+                (type,)
+            )
+        rows = await cursor.fetchall()
+        columns = [column[0] for column in cursor.description] if cursor.description else []
+        ticket_list = [dict(zip(columns, row)) for row in rows]
 
     return type, ticket_list
 
@@ -638,6 +661,73 @@ async def replace_ticket_status(ticket_id: int, status: str, role: str) -> None:
     status_column = 'status_for_user' if role == 'user' else 'status_for_admin'
     async with get_connection() as conn:
         await conn.execute(f'''UPDATE tickets SET {status_column} = ? WHERE id = ?''', (status, ticket_id))
+
+
+async def try_lock_ticket_for_admin(ticket_id: int, user_id: int) -> bool:
+    """Пытается установить lock на тикет для администратора. Возвращает True при успехе."""
+    async with get_connection() as conn:
+        await conn.execute(
+            '''UPDATE tickets
+               SET under_admin_review = ?, opened_by_admin_at = CURRENT_TIMESTAMP
+               WHERE id = ?
+                 AND (under_admin_review IS NULL OR under_admin_review = 0 OR under_admin_review = ?)''',
+            (user_id, ticket_id, user_id)
+        )
+        changes_cursor = await conn.execute('SELECT changes()')
+        changes = await changes_cursor.fetchone()
+    return bool(changes and changes[0] > 0)
+
+
+async def clear_ticket_lock(ticket_id: int) -> None:
+    """Сбрасывает lock тикета."""
+    async with get_connection() as conn:
+        await conn.execute(
+            '''UPDATE tickets
+               SET under_admin_review = NULL, opened_by_admin_at = NULL
+               WHERE id = ?''',
+            (ticket_id,)
+        )
+
+
+async def is_ticket_locked_for_admin(ticket_id: int, user_id: int) -> bool:
+    """Проверяет, закреплён ли тикет за другим администратором."""
+    async with get_connection() as conn:
+        cursor = await conn.execute(
+            '''SELECT under_admin_review
+               FROM tickets
+               WHERE id = ?''',
+            (ticket_id,)
+        )
+        row = await cursor.fetchone()
+    if not row:
+        return True
+    lock_owner = row[0]
+    return lock_owner not in (None, 0, user_id)
+
+
+async def get_ticket_id_by_message_id(message_id: int) -> int | None:
+    """Возвращает ticket_id по id сообщения в таблице messages."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT ticket_id FROM messages WHERE id = ?', (message_id,))
+        row = await cursor.fetchone()
+    return row[0] if row else None
+
+
+async def clear_stale_ticket_locks(max_age_hours: int = 1) -> int:
+    """Очищает lock у тикетов, открытых более max_age_hours назад."""
+    async with get_connection() as conn:
+        await conn.execute(
+            '''UPDATE tickets
+               SET under_admin_review = NULL, opened_by_admin_at = NULL
+               WHERE under_admin_review IS NOT NULL
+                 AND under_admin_review != 0
+                 AND opened_by_admin_at IS NOT NULL
+                 AND opened_by_admin_at <= datetime('now', ?)''',
+            (f'-{max_age_hours} hours',)
+        )
+        changes_cursor = await conn.execute('SELECT changes()')
+        changes = await changes_cursor.fetchone()
+    return changes[0] if changes else 0
 
 
 async def get_users_for_water_reminders() -> list[tuple]:
@@ -1471,8 +1561,3 @@ async def is_user_banned(user_id: int) -> bool:
         row = await cursor.fetchone()
     return row is not None and row[0] == 'BANNED'
 
-
-async def set_lock_ticket_for_admins(ticket_id : int, user_id: int) -> None:
-    """Ставит lock на обращение, при его открытии, защищает от повторного открытия другим администратором"""
-    async with get_connection() as conn:
-        await conn.execute('UPDATE tickets SET under_admin_review = ? ,opened_by_admin_at = CURRENT_TIMESTAMP WHERE id = ?', (user_id,ticket_id,))

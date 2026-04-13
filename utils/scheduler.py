@@ -5,6 +5,7 @@ from typing import Any
 
 from database import (
     add_water_ml,
+    clear_stale_ticket_locks,
     delete_water_log,
     fetch_water_stats_all,
     get_activity_goal_and_today_count,
@@ -47,6 +48,7 @@ class Scheduler:
         self.running = False
         self.task = None
         self.check_interval = 120  # секунд
+        self._last_ticket_lock_cleanup = datetime.min
 
     async def start(self) -> None:
         """Запускает фоновый цикл проверки напоминаний."""
@@ -86,6 +88,17 @@ class Scheduler:
         await self._check_inactive_users_reminders(quiet_hours)
         await self._check_sleep_reminders()
         await self._check_weekly_water_reset()
+        await self._cleanup_stale_ticket_locks()
+
+    async def _cleanup_stale_ticket_locks(self) -> None:
+        """Cleans stale ticket locks every 20 minutes."""
+        now = datetime.utcnow()
+        if now - self._last_ticket_lock_cleanup < timedelta(minutes=20):
+            return
+        self._last_ticket_lock_cleanup = now
+        cleared = await clear_stale_ticket_locks(max_age_hours=1)
+        if cleared:
+            _logger.info(f"Stale ticket locks cleared: {cleared}")
 
     @staticmethod
     def _is_quiet_hours(user_id: int, quiet_hours: dict) -> bool:
@@ -359,3 +372,4 @@ class Scheduler:
 
         except Exception as e:
             _logger.error(f"Пользователь {user_id}: критическая ошибка при сбросе - {e}")
+
