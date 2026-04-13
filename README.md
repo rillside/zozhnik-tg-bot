@@ -107,7 +107,7 @@ aiohttp>=3.9.0
 
 ```bash
 git clone https://github.com/твой-юзербейм/zozhnik-bot.git
-cd zozhnik-bot
+cd zozhnik-tg-bot
 ```
 
 ### 2️⃣ Виртуальное окружение
