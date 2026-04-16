@@ -107,10 +107,9 @@ def settings_keyboard() -> types.InlineKeyboardMarkup:
     activity_settings = types.InlineKeyboardButton("💪 Активность", callback_data='activity_settings')
     dream_settings = types.InlineKeyboardButton("😴 Сон", callback_data='dream_settings')
     timezone_settings = types.InlineKeyboardButton("🌍 Часовой пояс", callback_data='timezone_settings')
-    review_settings = types.InlineKeyboardButton("📈 Обзор", callback_data='review_settings')
     cancel_settings = types.InlineKeyboardButton("↩️ Закрыть настройки", callback_data='cancel_settings')
     keyboard.add(water_settings, activity_settings, dream_settings)
-    keyboard.add(timezone_settings, review_settings)
+    keyboard.add(timezone_settings)
     keyboard.add(cancel_settings)
     return keyboard
 

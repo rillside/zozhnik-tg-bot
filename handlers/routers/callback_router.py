@@ -224,8 +224,6 @@ async def _route_settings(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) 
             await activity_settings_open(call, bot)
         case "dream_settings":
             await sleep_settings_open(call, bot)
-        case "review_settings":
-            pass
         case "timezone_settings":
             await bot.answer_callback_query(call.id, show_alert=False)
             await bot.delete_message(call.message.chat.id, call.message.message_id)
