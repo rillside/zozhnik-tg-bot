@@ -33,7 +33,7 @@ async def ask_ollama(system_prompt: str, user_message: str) -> str | None:
                 return data["message"]["content"].strip()
 
     except aiohttp.ClientConnectorError:
-        _logger.error("Ollama недоступна (connection refused). Убедитесь, что запущен 'ollama serve'")
+        _logger.error("Ollama недоступна (соединение отклонено). Убедитесь, что запущен 'ollama serve'")
         return None
     except aiohttp.ServerTimeoutError:
         _logger.error("Ollama не ответила за 120 секунд")

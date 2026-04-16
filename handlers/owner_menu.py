@@ -1,4 +1,4 @@
-import re
+﻿import re
 from typing import Any
 from config import is_admin, owners_copy
 from database import is_user_valid, get_all_admin, get_user_status, \

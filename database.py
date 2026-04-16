@@ -2,17 +2,14 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from typing import Any, AsyncGenerator
-
 import aiosqlite
 
 _logger = logging.getLogger(__name__)
 
-
-# Подключение к базе данных
-
+"""Инфраструктура и инициализация"""
 @asynccontextmanager
 async def get_connection() -> AsyncGenerator:
-    """Асинхронный контекстный менеджер для получения соединения с базой данных с автоматическим commit/rollback."""
+    """Асинхронный контекстный менеджер для получения соединения с базой данных с автоматическим commit/rollback транзакции."""
     conn = None
     try:
         conn = await aiosqlite.connect('database.db')
@@ -30,9 +27,6 @@ async def get_connection() -> AsyncGenerator:
     finally:
         if conn:
             await conn.close()
-
-
-# Инициализация таблиц
 
 async def init_db() -> None:
     """Создаёт все необходимые таблицы базы данных, если они ещё не существуют."""
@@ -204,9 +198,9 @@ async def init_db() -> None:
             )
         ''')
 
-
+"""Пользователи и администрация"""
 async def add_user(user_id: int, username: str | None, status: str) -> None:
-    """Добавляет пользователя в БД или обновляет его username/status и last_activity, если он уже существует."""
+    """Добавляет пользователя в БД или обновляет его username/status и время последней активности, если он уже существует."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT 1 FROM users WHERE user_id = ?', (user_id,))
         exists = await cursor.fetchone()
@@ -227,14 +221,12 @@ async def add_user(user_id: int, username: str | None, status: str) -> None:
             await conn.execute('''INSERT INTO user_xp (user_id) VALUES (?)''', (user_id,))
             _logger.info(f"Added new user: {user_id} - {'@' + username} - {status}")
 
-
 async def all_users() -> list[int]:
-    """Возвращает список user_id всех пользователей."""
+    """Возвращает список ID пользователей."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT * FROM users')
         users = await cursor.fetchall()
     return [user[0] for user in users]
-
 
 async def get_new_users_count(days: int) -> int:
     """Возвращает количество новых пользователей, зарегистрировавшихся за последние N дней."""
@@ -246,7 +238,6 @@ async def get_new_users_count(days: int) -> int:
     ''', (f'-{days} days',))
         result = await cursor.fetchone()
     return result[0]
-
 
 async def update_user_activity_smart(user_id: int) -> None:
     """Обновляет время последней активности пользователя, но не чаще одного раза в час."""
@@ -260,7 +251,6 @@ async def update_user_activity_smart(user_id: int) -> None:
         )
         ''', (user_id,))
 
-
 async def get_active_users_count(days: int = 4) -> int:
     """Возвращает количество активных пользователей за последние N дней."""
     async with get_connection() as conn:
@@ -271,7 +261,6 @@ async def get_active_users_count(days: int = 4) -> int:
         ''', (f'-{days} days',))
         result = await cursor.fetchone()
     return result[0]
-
 
 async def get_user_status(user_id: int | None = None, username: str | None = None) -> str:
     """Возвращает статус пользователя: 'User', 'Admin' или 'Owner'."""
@@ -286,9 +275,8 @@ async def get_user_status(user_id: int | None = None, username: str | None = Non
             result = await cursor.fetchone()
     return result[0] if result else 'User'
 
-
 async def get_all_admin(only_admin: bool = True) -> list[tuple]:
-    """Возвращает список (user_id, username) администраторов, при only_admin=False включая владельцев."""
+    """Возвращает список (ID пользователя, username) администраторов, при only_admin=False включая владельцев."""
     async with get_connection() as conn:
         cursor = await conn.cursor()
         status_list = ['Admin']
@@ -303,7 +291,6 @@ async def get_all_admin(only_admin: bool = True) -> list[tuple]:
             ''')
         result = await cursor.fetchall()
     return result
-
 
 async def is_user_valid(user_id: int | None = None, username: str | None = None) -> tuple | None:
     """Проверяет, существует ли пользователь в базе данных."""
@@ -320,9 +307,8 @@ async def is_user_valid(user_id: int | None = None, username: str | None = None)
         result = await cursor.fetchone()
     return result
 
-
 async def replace_status(status: str, user_id: int | None = None, username: str | None = None) -> None:
-    """Обновляет статус пользователя по user_id или username."""
+    """Обновляет статус пользователя по ID пользователя или username."""
     async with get_connection() as conn:
         cursor = await conn.cursor()
 
@@ -333,22 +319,19 @@ async def replace_status(status: str, user_id: int | None = None, username: str 
             await cursor.execute('UPDATE users SET status = ? WHERE username = ?',
                                  (status, username))
 
-
 async def get_id_by_username(username: str) -> int | None:
-    """Возвращает user_id по username."""
+    """Возвращает ID пользователя по username."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT user_id FROM users WHERE username = ?', (username,))
         result = await cursor.fetchone()
     return result[0]
 
-
 async def get_username_by_id(user_id: int) -> str | None:
-    """Возвращает username по user_id."""
+    """Возвращает username по ID пользователя."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT username FROM users WHERE user_id = ?', (user_id,))
         result = await cursor.fetchone()
     return result[0]
-
 
 async def update_username(user_id: int, username: str | None, bot) -> None:
     """Обновляет username пользователя и уведомляет админов, если он администратор."""
@@ -364,9 +347,55 @@ async def update_username(user_id: int, username: str | None, bot) -> None:
             from handlers.admin_notifications import admin_update_notification
             await admin_update_notification(bot, user_id, old_username, username)
 
+async def search_user(query: str) -> tuple | None:
+    """Поиск пользователя по ID пользователя или username.
+    Возвращает (ID пользователя, username, status, created_date, last_activity, timezone) или None."""
+    async with get_connection() as conn:
+        query = query.strip().lstrip('@')
+        if query.isdigit():
+            cursor = await conn.execute(
+                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE user_id = ?',
+                (int(query),)
+            )
+        else:
+            cursor = await conn.execute(
+                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE username = ?',
+                (query,)
+            )
+        return await cursor.fetchone()
 
-# Водный трекер
+async def is_user_banned(user_id: int) -> bool:
+    """Проверяет, забанен ли пользователь."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+    return row is not None and row[0] == 'BANNED'
 
+"""Часовой пояс и время пользователя"""
+async def set_timezone(user_id: int, new_timezone: int) -> None:
+    """Устанавливает часовой пояс пользователя во всех связанных таблицах."""
+    async with get_connection() as conn:
+        await conn.execute('UPDATE users SET timezone = ? WHERE user_id = ? ', (new_timezone, user_id))
+        await conn.execute('UPDATE track_water SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
+        await conn.execute('UPDATE track_activity SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
+        await conn.execute('UPDATE track_sleep SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
+
+async def get_timezone(user_id: int) -> int | None:
+    """Возвращает смещение часового пояса относительно МСК или None."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT timezone FROM users WHERE user_id = ?', (user_id,))
+        result = await cursor.fetchone()
+    return result[0] if result else None
+
+async def get_user_time_now(user_id: int) -> datetime:
+    """Возвращает текущее локальное время пользователя с учётом его часового пояса."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('SELECT timezone FROM users WHERE user_id = ?', (user_id,))
+        row = await cursor.fetchone()
+    tz = row[0] if row and row[0] is not None else 0
+    return datetime.now() + timedelta(hours=tz)
+
+"""Водный трекер"""
 async def water_set_reminder_type(user_id: int, broadcast_type: str, broadcast_interval: int | None = None) -> None:
     """Устанавливает тип и интервал напоминаний о воде для пользователя."""
     async with get_connection() as conn:
@@ -384,13 +413,11 @@ async def water_set_reminder_type(user_id: int, broadcast_type: str, broadcast_i
         await cursor.execute('UPDATE track_water SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?',
                              (user_id,))
 
-
 async def update_reminder_sent_time(user_id: int) -> None:
     """Обновляет время последней отправки напоминания о воде."""
     async with get_connection() as conn:
         await conn.execute('''UPDATE track_water SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?''',
                            (user_id,))
-
 
 async def update_water_goal(user_id: int, new_goal: int) -> None:
     """Устанавливает дневную цель по воде в мл для пользователя."""
@@ -398,7 +425,6 @@ async def update_water_goal(user_id: int, new_goal: int) -> None:
         await conn.execute('UPDATE track_water SET goal_ml = ? WHERE user_id = ?',
                            (new_goal, user_id)
                            )
-
 
 async def count_users_trackers(db_table: str, column_name: str, user_id: int | None = None) -> int:
     """Считает количество записей, не равных NULL в column_name, опционально фильтруя по пользователю."""
@@ -419,7 +445,6 @@ async def count_users_trackers(db_table: str, column_name: str, user_id: int | N
             result = await cursor.fetchone()
     return result[0]
 
-
 async def add_water_ml(user_id: int, volume_ml: int, add_total: bool = True) -> None:
     """Добавляет выпитый объём воды в статистику пользователя за текущий день недели."""
     today = await get_user_time_now(user_id)
@@ -437,7 +462,6 @@ async def add_water_ml(user_id: int, volume_ml: int, add_total: bool = True) -> 
         await cursor.execute('INSERT INTO water_logs (user_id, amount, week_start) VALUES (?, ?, ?) ',
                              (user_id, volume_ml, last_monday))
 
-
 async def water_stats(user_id: int) -> tuple:
     """Возвращает пару (goal_ml, выпито сегодня) для пользователя."""
     today = await get_user_time_now(user_id)
@@ -447,39 +471,11 @@ async def water_stats(user_id: int) -> tuple:
         result = map(int, await cursor.fetchone())
     return result
 
-
-async def set_timezone(user_id: int, new_timezone: int) -> None:
-    """Устанавливает часовой пояс пользователя во всех связанных таблицах."""
-    async with get_connection() as conn:
-        await conn.execute('UPDATE users SET timezone = ? WHERE user_id = ? ', (new_timezone, user_id))
-        await conn.execute('UPDATE track_water SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
-        await conn.execute('UPDATE track_activity SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
-        await conn.execute('UPDATE track_sleep SET timezone = ? WHERE user_id = ?', (new_timezone, user_id))
-
-
-async def get_timezone(user_id: int) -> int | None:
-    """Возвращает смещение часового пояса относительно МСК или None."""
-    async with get_connection() as conn:
-        cursor = await conn.execute('SELECT timezone FROM users WHERE user_id = ?', (user_id,))
-        result = await cursor.fetchone()
-    return result[0] if result else None
-
-
-async def get_user_time_now(user_id: int) -> datetime:
-    """Возвращает текущее локальное время пользователя с учётом его часового пояса."""
-    async with get_connection() as conn:
-        cursor = await conn.execute('SELECT timezone FROM users WHERE user_id = ?', (user_id,))
-        row = await cursor.fetchone()
-    tz = row[0] if row and row[0] is not None else 0
-    return datetime.now() + timedelta(hours=tz)
-
-
 async def update_last_add_water_ml(user_id: int) -> None:
     """Обновляет время последнего добавления воды для пользователя."""
     async with get_connection() as conn:
         await conn.execute('UPDATE track_water SET last_update = CURRENT_TIMESTAMP WHERE user_id = ?',
                            (user_id,))
-
 
 async def get_water_stats_for_today(user_id: int) -> tuple:
     """Возвращает (last_update, выпито сегодня) для пользователя."""
@@ -490,7 +486,6 @@ async def get_water_stats_for_today(user_id: int) -> tuple:
         update_time, cnt_water = await cursor.fetchone()
     return update_time, cnt_water
 
-
 async def fetch_water_stats_all() -> list[tuple]:
     """Возвращает статистику водного трекера для всех пользователей."""
     async with get_connection() as conn:
@@ -500,12 +495,10 @@ async def fetch_water_stats_all() -> list[tuple]:
          FROM track_water''')
         return await cursor.fetchall()
 
-
 async def set_last_reset_water(user_id: int, last_reset: str) -> None:
     """Сохраняет дату последнего сброса еженедельной статистики воды."""
     async with get_connection() as conn:
         await conn.execute('UPDATE track_water SET last_reset = ? WHERE user_id = ?', (last_reset, user_id))
-
 
 async def water_reset(user_id: int) -> None:
     """Сбрасывает ежедневные счётчики воды за все дни недели."""
@@ -513,22 +506,26 @@ async def water_reset(user_id: int) -> None:
         await conn.execute('''UPDATE track_water SET Monday = 0,Tuesday = 0,
         Wednesday = 0,Thursday = 0,Friday = 0,Saturday = 0,Sunday = 0 WHERE USER_ID = ?''', (user_id,))
 
-
 async def get_lost_records_of_water(user_id: int) -> list[tuple]:
     """Возвращает все записи в журнале воды пользователя."""
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT id,amount,week_start FROM water_logs WHERE user_id = ?''', (user_id,))
         return await cursor.fetchall()
 
-
 async def delete_water_log(log_id: int) -> None:
     """Удаляет запись в журнале воды по её ID."""
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM water_logs WHERE id = ?''', (log_id,))
 
+async def get_users_for_water_reminders() -> list[tuple]:
+    """Возвращает пользователей с включенными напоминаниями о воде."""
+    async with get_connection() as conn:
+        cursor = await conn.execute('''SELECT user_id,broadcast_type,broadcast_interval,
+        last_broadcast,last_update FROM track_water WHERE broadcast_type IS NOT NULL''')
+        result = await cursor.fetchall()
+    return result
 
-# Тикеты поддержки
-
+"""Поддержка и тикеты"""
 async def add_ticket(title: str, user_id: int, username: str | None, first_name: str, type_supp: str) -> int:
     """Создаёт новый тикет поддержки и возвращает его ID."""
     async with get_connection() as conn:
@@ -538,13 +535,11 @@ async def add_ticket(title: str, user_id: int, username: str | None, first_name:
         ticket_id = cursor.lastrowid
     return ticket_id
 
-
 async def delete_ticket(ticket_id: int) -> None:
     """Удаляет тикет и всю его переписку из базы данных."""
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM tickets WHERE id = ?''',
                            (ticket_id,))
-
 
 async def send_supp_msg(ticket_id: int, text: str | None, is_from_user: bool,
                         type_msg: str = 'string', file_id: str | None = None,
@@ -564,7 +559,6 @@ async def send_supp_msg(ticket_id: int, text: str | None, is_from_user: bool,
         await conn.execute('''UPDATE tickets SET updated_at = CURRENT_TIMESTAMP WHERE id = ?''',
                            (ticket_id,))
 
-
 async def tickets_by_user(user_id: int) -> dict[str, Any] | None:
     """Возвращает первый тикет пользователя или None, если тикетовнет."""
     async with get_connection() as conn:
@@ -575,7 +569,6 @@ async def tickets_by_user(user_id: int) -> dict[str, Any] | None:
             return None
         columns = [column[0] for column in cursor.description]
     return dict(zip(columns, row))
-
 
 async def count_tickets_for_admin(type_ticket: str) -> int:
     """Считает количество тикетов заданного типа."""
@@ -588,9 +581,8 @@ async def count_tickets_for_admin(type_ticket: str) -> int:
         result = await cursor.fetchone()
     return result[0] if result else 0
 
-
 async def load_info_by_ticket(ticket_id: int) -> tuple[dict[str, Any] | None, list]:
-    """Return (ticket_info, messages) for a ticket.
+    """Возвращает (ticket_info, messages) для тикета.
 
     `ticket_info` is returned as a dict with named columns from `tickets`.
     """
@@ -609,7 +601,6 @@ async def load_info_by_ticket(ticket_id: int) -> tuple[dict[str, Any] | None, li
         message_info = [dict(zip(columns, row)) for row in message_rows]
     return ticket_info, message_info
 
-
 async def get_photo_ids_by_ticket(ticket_id: int) -> list[int]:
     """Возвращает список ID фотосообщений в тикете."""
     async with get_connection() as conn:
@@ -617,14 +608,12 @@ async def get_photo_ids_by_ticket(ticket_id: int) -> list[int]:
         rows = await cursor.fetchall()
         return [row[0] for row in rows]
 
-
 async def get_photo_file_id(msg_id: int) -> str | None:
     """Возвращает file_id фотосообщения по ID записи в истории."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT file_id FROM messages WHERE id = ?', (msg_id,))
         result = await cursor.fetchone()
         return result[0] if result else None
-
 
 async def load_tickets_info(user_id: int | None = None, role: str = 'user',
                             type: str | None = None) -> tuple[str | None, list[dict[str, Any]]]:
@@ -646,7 +635,6 @@ async def load_tickets_info(user_id: int | None = None, role: str = 'user',
 
     return type, ticket_list
 
-
 async def get_ticket_status(ticket_id: int, role: str) -> str | None:
     """Возвращает статус тикета для указанной роли ('user' или 'admin')."""
     status_column = 'status_for_user' if role == 'user' else 'status_for_admin'
@@ -655,13 +643,11 @@ async def get_ticket_status(ticket_id: int, role: str) -> str | None:
         result = await cursor.fetchone()
     return result[0]
 
-
 async def replace_ticket_status(ticket_id: int, status: str, role: str) -> None:
     """Обновляет статус тикета для указанной роли."""
     status_column = 'status_for_user' if role == 'user' else 'status_for_admin'
     async with get_connection() as conn:
         await conn.execute(f'''UPDATE tickets SET {status_column} = ? WHERE id = ?''', (status, ticket_id))
-
 
 async def try_lock_ticket_for_admin(ticket_id: int, user_id: int) -> bool:
     """Пытается установить lock на тикет для администратора. Возвращает True при успехе."""
@@ -677,7 +663,6 @@ async def try_lock_ticket_for_admin(ticket_id: int, user_id: int) -> bool:
         changes = await changes_cursor.fetchone()
     return bool(changes and changes[0] > 0)
 
-
 async def clear_ticket_lock(ticket_id: int) -> None:
     """Сбрасывает lock тикета."""
     async with get_connection() as conn:
@@ -687,7 +672,6 @@ async def clear_ticket_lock(ticket_id: int) -> None:
                WHERE id = ?''',
             (ticket_id,)
         )
-
 
 async def is_ticket_locked_for_admin(ticket_id: int, user_id: int) -> bool:
     """Проверяет, закреплён ли тикет за другим администратором."""
@@ -704,14 +688,12 @@ async def is_ticket_locked_for_admin(ticket_id: int, user_id: int) -> bool:
     lock_owner = row[0]
     return lock_owner not in (None, 0, user_id)
 
-
 async def get_ticket_id_by_message_id(message_id: int) -> int | None:
     """Возвращает ticket_id по id сообщения в таблице messages."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT ticket_id FROM messages WHERE id = ?', (message_id,))
         row = await cursor.fetchone()
     return row[0] if row else None
-
 
 async def clear_stale_ticket_locks(max_age_hours: int = 1) -> int:
     """Очищает lock у тикетов, открытых более max_age_hours назад."""
@@ -729,18 +711,7 @@ async def clear_stale_ticket_locks(max_age_hours: int = 1) -> int:
         changes = await changes_cursor.fetchone()
     return changes[0] if changes else 0
 
-
-async def get_users_for_water_reminders() -> list[tuple]:
-    """Возвращает пользователей с включенными напоминаниями о воде."""
-    async with get_connection() as conn:
-        cursor = await conn.execute('''SELECT user_id,broadcast_type,broadcast_interval,
-        last_broadcast,last_update FROM track_water WHERE broadcast_type IS NOT NULL''')
-        result = await cursor.fetchall()
-    return result
-
-
-# Физическая активность
-
+"""Трекер активности и напоминания"""
 async def get_activity_goal_and_today_count(user_id: int) -> tuple:
     """Возвращает (goal_exercises, today_count) или (None, 0) если цель не задана."""
     today = await get_user_time_now(user_id)
@@ -759,7 +730,6 @@ async def get_activity_goal_and_today_count(user_id: int) -> tuple:
         count = (await cursor.fetchone())[0]
     return row[0], count
 
-
 async def update_activity_goal(user_id: int, goal: int) -> None:
     """Устанавливает дневную цель по упражнениям."""
     async with get_connection() as conn:
@@ -767,7 +737,6 @@ async def update_activity_goal(user_id: int, goal: int) -> None:
             'UPDATE track_activity SET goal_exercises = ? WHERE user_id = ?',
             (goal, user_id)
         )
-
 
 async def activity_set_reminder_type(user_id: int, broadcast_type: str, broadcast_interval: int | None = None) -> None:
     """Устанавливает тип и интервал напоминаний об активности."""
@@ -785,7 +754,6 @@ async def activity_set_reminder_type(user_id: int, broadcast_type: str, broadcas
                 (broadcast_type, broadcast_interval, user_id)
             )
 
-
 async def update_activity_reminder_sent_time(user_id: int) -> None:
     """Обновляет время последней отправки напоминания об активности."""
     async with get_connection() as conn:
@@ -793,7 +761,6 @@ async def update_activity_reminder_sent_time(user_id: int) -> None:
             'UPDATE track_activity SET last_broadcast = CURRENT_TIMESTAMP WHERE user_id = ?',
             (user_id,)
         )
-
 
 async def get_users_for_activity_reminders() -> list[tuple]:
     """Возвращает пользователей с настроенными напоминаниями об активности."""
@@ -805,9 +772,8 @@ async def get_users_for_activity_reminders() -> list[tuple]:
         ''')
         return await cursor.fetchall()
 
-
 async def get_inactive_users_for_reminder() -> list[int]:
-    """Пользователи: last_activity > 4 дней, и last_inactivity_reminder NULL или > 4 дней."""
+    """Пользователи: последняя активность > 4 дней, и last_inactivity_reminder NULL или > 4 дней."""
     async with get_connection() as conn:
         cursor = await conn.execute('''
             SELECT u.user_id
@@ -819,7 +785,6 @@ async def get_inactive_users_for_reminder() -> list[int]:
         ''')
         return [row[0] for row in await cursor.fetchall()]
 
-
 async def update_last_inactivity_reminder(user_id: int) -> None:
     """Обновляет время последнего напоминания о неактивности."""
     async with get_connection() as conn:
@@ -828,14 +793,13 @@ async def update_last_inactivity_reminder(user_id: int) -> None:
             (user_id,)
         )
 
-
+"""Упражнения и спортивная статистика"""
 async def is_exercise_name_exists(name: str) -> bool:
     """Проверяет, есть ли уже активное упражнение с таким названием."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT 1 FROM exercises WHERE name = ? AND is_active = 1', (name,))
         result = await cursor.fetchone()
         return result is not None
-
 
 async def add_exercise_to_db(name: str, description: str, category: str, difficulty: str,
                              file_id: str | None, created_by: int,
@@ -848,9 +812,6 @@ async def add_exercise_to_db(name: str, description: str, category: str, difficu
                            (name, description, category, difficulty, file_id, channel_message_id, created_by)
                            )
 
-
-# Упражнения
-
 async def get_exercises_id_name(category: str, difficulty: str) -> list[tuple]:
     """Возвращает (id, name) всех упражнений (в том числе неактивных) по категории и сложности."""
     async with get_connection() as conn:
@@ -858,7 +819,6 @@ async def get_exercises_id_name(category: str, difficulty: str) -> list[tuple]:
                                     (category, difficulty))
         res = await cursor.fetchall()
     return res
-
 
 async def get_active_exercises(category: str, difficulty: str) -> list[tuple]:
     """Возвращает (id, name) активных упражнений по категории и сложности."""
@@ -869,7 +829,6 @@ async def get_active_exercises(category: str, difficulty: str) -> list[tuple]:
         res = await cursor.fetchall()
     return res
 
-
 async def get_exercise_by_id(exercise_id: int) -> tuple | None:
     """Возвращает все поля упражнения по его ID."""
     async with get_connection() as conn:
@@ -877,14 +836,12 @@ async def get_exercise_by_id(exercise_id: int) -> tuple | None:
         res = await cursor.fetchone()
     return res
 
-
 async def get_file_id_by_ex_id(ex_id: int) -> str | None:
     """Возвращает file_id прикреплённого видео для упражнения."""
     async with get_connection() as conn:
         cursor = await conn.execute('''SELECT file_id FROM exercises WHERE id = ?''', (ex_id,))
         res = await cursor.fetchone()
     return res[0]
-
 
 async def get_exercise_media_info(ex_id: int) -> tuple:
     """Возвращает (file_id, channel_message_id) для упражнения."""
@@ -896,7 +853,6 @@ async def get_exercise_media_info(ex_id: int) -> tuple:
         res = await cursor.fetchone()
     return res if res else (None, None)
 
-
 async def update_exercise_file_id(ex_id: int, new_file_id: str) -> None:
     """Обновляет file_id для упражнения."""
     async with get_connection() as conn:
@@ -906,7 +862,6 @@ async def update_exercise_file_id(ex_id: int, new_file_id: str) -> None:
         )
     _logger.info(f"Обновлен file_id для упражнения {ex_id}")
 
-
 async def update_message_file_id(msg_id: int, new_file_id: str) -> None:
     """Обновляет file_id для фотосообщения в тикете."""
     async with get_connection() as conn:
@@ -915,7 +870,6 @@ async def update_message_file_id(msg_id: int, new_file_id: str) -> None:
             (new_file_id, msg_id)
         )
     _logger.info(f"Обновлен file_id для сообщения {msg_id}")
-
 
 async def get_message_media_info(msg_id: int) -> tuple:
     """Возвращает (file_id, channel_message_id) для сообщения в тикете."""
@@ -927,7 +881,6 @@ async def get_message_media_info(msg_id: int) -> tuple:
         res = await cursor.fetchone()
     return res if res else (None, None)
 
-
 async def get_exercise_status(ex_id: int) -> int:
     """Возвращает статус активности упражнения: 1 — активно, 0 — неактивно."""
     async with get_connection() as conn:
@@ -936,13 +889,11 @@ async def get_exercise_status(ex_id: int) -> int:
         res = await cursor.fetchone()
         return int(res[0])
 
-
 async def update_exercise_in_db(ex_id: int, db_field: str, new_value: Any) -> None:
     """Обновляет указанное поле упражнения в базе данных."""
     async with get_connection() as conn:
         await conn.execute(f'''UPDATE exercises SET {db_field} = ? WHERE id = ?''',
                            (new_value, ex_id))
-
 
 async def delete_exercise_in_db(ex_id: int) -> None:
     """Удаляет упражнение и все связанные записи в журнале выполнений."""
@@ -951,7 +902,6 @@ async def delete_exercise_in_db(ex_id: int) -> None:
                            (ex_id,))
         await conn.execute('''DELETE FROM exercises_logs WHERE exercise_id = ?''',
                            (ex_id,))
-
 
 async def get_exercise_stats() -> dict:
     """
@@ -996,7 +946,6 @@ async def get_exercise_stats() -> dict:
             'weekly': weekly
         }
 
-
 async def check_ex_is_favorite(ex_id: int, user_id: int) -> bool:
     """Проверяет, находится ли упражнение в избранном у пользователя."""
     async with get_connection() as conn:
@@ -1005,20 +954,17 @@ async def check_ex_is_favorite(ex_id: int, user_id: int) -> bool:
         res = await cursor.fetchone()
         return bool(res)
 
-
 async def add_ex_to_favorite(user_id: int, ex_id: int) -> None:
     """Добавляет упражнение в избранное пользователя."""
     async with get_connection() as conn:
         await conn.execute('''INSERT INTO exercises_user_favorites (user_id,exercise_id) VALUES (?,?)''',
                            (user_id, ex_id))
 
-
 async def remove_ex_from_favorite(user_id: int, ex_id: int) -> None:
     """Удаляет упражнение из избранного пользователя."""
     async with get_connection() as conn:
         await conn.execute('''DELETE FROM exercises_user_favorites WHERE exercise_id = ? AND user_id = ?''',
                            (ex_id, user_id))
-
 
 async def get_favorite_exercises(user_id: int) -> list[tuple]:
     """Возвращает список (id, name) избранных активных упражнений пользователя."""
@@ -1031,7 +977,6 @@ async def get_favorite_exercises(user_id: int) -> list[tuple]:
         ''', (user_id,))
         return await cursor.fetchall()
 
-
 async def add_exercise_log(user_id: int, exercise_id: int) -> None:
     """Добавляет запись о выполнении упражнения."""
     async with get_connection() as conn:
@@ -1039,7 +984,6 @@ async def add_exercise_log(user_id: int, exercise_id: int) -> None:
             '''INSERT INTO exercises_logs (user_id, exercise_id) VALUES (?, ?)''',
             (user_id, exercise_id)
         )
-
 
 async def get_last_exercise_log(user_id: int) -> tuple | None:
     """Возвращает (exercise_id, time) последней записи о выполнении пользователем или None."""
@@ -1050,7 +994,6 @@ async def get_last_exercise_log(user_id: int) -> tuple | None:
             (user_id,)
         )
         return await cursor.fetchone()
-
 
 async def get_user_exercise_stats(user_id: int) -> dict:
     """Статистика выполнения упражнений пользователем."""
@@ -1079,7 +1022,6 @@ async def get_user_exercise_stats(user_id: int) -> dict:
 
         return {'total': total, 'weekly': weekly, 'top': top}
 
-
 async def get_user_exercise_stats_for_exercise(user_id: int, exercise_id: int) -> dict:
     """Статистика выполнения конкретного упражнения пользователем."""
     async with get_connection() as conn:
@@ -1096,7 +1038,6 @@ async def get_user_exercise_stats_for_exercise(user_id: int, exercise_id: int) -
         weekly = (await cursor.fetchone())[0]
 
         return {'total': total, 'weekly': weekly}
-
 
 async def get_user_full_stats(user_id: int) -> dict | None:
     """Получает полную статистику пользователя для главного меню."""
@@ -1201,10 +1142,7 @@ async def get_user_full_stats(user_id: int) -> dict | None:
             }
         }
 
-
-
-# Трекер сна
-
+"""Сон и напоминания о сне"""
 async def get_sleep_settings(user_id: int) -> tuple | None:
     """Возвращает (sleep_time, wake_time, reminders_enabled) или None."""
     async with get_connection() as conn:
@@ -1214,7 +1152,6 @@ async def get_sleep_settings(user_id: int) -> tuple | None:
         )
         return await cursor.fetchone()
 
-
 async def update_sleep_time(user_id: int, sleep_time: str) -> None:
     """Устанавливает время отбоя для пользователя."""
     async with get_connection() as conn:
@@ -1223,7 +1160,6 @@ async def update_sleep_time(user_id: int, sleep_time: str) -> None:
             (sleep_time, user_id)
         )
 
-
 async def update_wake_time(user_id: int, wake_time: str) -> None:
     """Устанавливает время подъёма для пользователя."""
     async with get_connection() as conn:
@@ -1231,7 +1167,6 @@ async def update_wake_time(user_id: int, wake_time: str) -> None:
             'UPDATE track_sleep SET wake_time = ? WHERE user_id = ?',
             (wake_time, user_id)
         )
-
 
 async def toggle_sleep_reminders(user_id: int) -> bool:
     """Переключает состояние напоминаний сна и возвращает новое значение."""
@@ -1245,7 +1180,6 @@ async def toggle_sleep_reminders(user_id: int) -> bool:
         )
         result = await cursor.fetchone()
     return bool(result[0])
-
 
 async def log_sleep_start(user_id: int) -> None:
     """Начинает новую сессию сна, закрывая незакрытые."""
@@ -1264,11 +1198,7 @@ async def log_sleep_start(user_id: int) -> None:
             (user_id, now_str)
         )
 
-
-MAX_SLEEP_MINUTES = 18 * 60  # лимит сна — 18 часов
-
-
-async def log_wake_up(user_id: int) -> tuple[int, bool] | None:
+async def log_wake_up(user_id: int, max_sleep_minutes: int) -> tuple[int, bool] | None:
     """Закрывает активную сессию сна. Возвращает (длительность в минутах, был_ли_лимит_18ч) или None."""
     now_user = await get_user_time_now(user_id)
     now_str = now_user.strftime('%Y-%m-%d %H:%M:%S')
@@ -1295,15 +1225,14 @@ async def log_wake_up(user_id: int) -> tuple[int, bool] | None:
             return None
         duration = int((now_user - sleep_start_dt).total_seconds() / 60)
         capped = False
-        if duration > MAX_SLEEP_MINUTES:
-            duration = MAX_SLEEP_MINUTES
+        if duration > max_sleep_minutes:
+            duration = max_sleep_minutes
             capped = True
         await conn.execute(
             'UPDATE sleep_logs SET wake_up = ?, duration = ? WHERE id = ?',
             (now_str, duration, log_id)
         )
     return duration, capped
-
 
 async def get_open_sleep_session(user_id: int) -> tuple | None:
     """Возвращает активную (незакрытую) сессию сна (id, sleep_start) или None."""
@@ -1315,7 +1244,6 @@ async def get_open_sleep_session(user_id: int) -> tuple | None:
         )
         return await cursor.fetchone()
 
-
 async def get_last_sleep_log(user_id: int) -> tuple | None:
     """Возвращает последнюю завершённую запись (id, sleep_start, wake_up, duration)."""
     async with get_connection() as conn:
@@ -1325,7 +1253,6 @@ async def get_last_sleep_log(user_id: int) -> tuple | None:
             (user_id,)
         )
         return await cursor.fetchone()
-
 
 async def get_sleep_week_stats(user_id: int) -> tuple:
     """Возвращает (count, avg_duration, min_duration, max_duration) за 7 дней."""
@@ -1338,7 +1265,6 @@ async def get_sleep_week_stats(user_id: int) -> tuple:
         )
         return await cursor.fetchone()
 
-
 async def get_sleep_history(user_id: int, limit: int = 7) -> list[tuple]:
     """Возвращает последние завершённые записи (sleep_start, wake_up, duration)."""
     async with get_connection() as conn:
@@ -1349,10 +1275,9 @@ async def get_sleep_history(user_id: int, limit: int = 7) -> list[tuple]:
         )
         return await cursor.fetchall()
 
-
 async def get_users_for_sleep_reminders() -> list[tuple]:
     """Пользователи с настроенными временами и включёнными напоминаниями.
-    Возвращает: (user_id, sleep_time, wake_time, timezone, last_sleep_reminder, last_wake_reminder, last_notification)"""
+    Возвращает: (ID пользователя, sleep_time, wake_time, timezone, last_sleep_reminder, last_wake_reminder, last_notification)"""
     async with get_connection() as conn:
         cursor = await conn.execute(
             '''SELECT ts.user_id, ts.sleep_time, ts.wake_time, ts.timezone,
@@ -1363,7 +1288,6 @@ async def get_users_for_sleep_reminders() -> list[tuple]:
                AND ts.reminders_enabled = 1'''
         )
         return await cursor.fetchall()
-
 
 async def get_last_notification(user_id: int) -> datetime | None:
     """Возвращает время последнего уведомления пользователю или None."""
@@ -1379,7 +1303,6 @@ async def get_last_notification(user_id: int) -> datetime | None:
             return None
     return None
 
-
 async def update_last_notification(user_id: int) -> None:
     """Обновляет время последнего уведомления пользователю."""
     async with get_connection() as conn:
@@ -1387,7 +1310,6 @@ async def update_last_notification(user_id: int) -> None:
             'UPDATE users SET last_notification = CURRENT_TIMESTAMP WHERE user_id = ?',
             (user_id,)
         )
-
 
 async def update_sleep_last_sleep_reminder(user_id: int) -> None:
     """Обновляет время последнего напоминания об отбое."""
@@ -1397,7 +1319,6 @@ async def update_sleep_last_sleep_reminder(user_id: int) -> None:
             (user_id,)
         )
 
-
 async def update_sleep_last_wake_reminder(user_id: int) -> None:
     """Обновляет время последнего напоминания о подъёме."""
     async with get_connection() as conn:
@@ -1406,9 +1327,8 @@ async def update_sleep_last_wake_reminder(user_id: int) -> None:
             (user_id,)
         )
 
-
 async def get_all_sleep_settings_for_quiet_hours() -> dict:
-    """Возвращает {user_id: (sleep_time, wake_time, timezone)} для тихих часов."""
+    """Возвращает {ID пользователя: (sleep_time, wake_time, timezone)} для тихих часов."""
     async with get_connection() as conn:
         cursor = await conn.execute(
             '''SELECT user_id, sleep_time, wake_time, timezone
@@ -1417,43 +1337,21 @@ async def get_all_sleep_settings_for_quiet_hours() -> dict:
         rows = await cursor.fetchall()
     return {row[0]: (row[1], row[2], row[3] or 0) for row in rows}
 
-
-
-
-# XP и уровни
-
-# Таблица очков за действия
-XP_REWARDS = {
-    'water_add': 5,          # добавил воду
-    'water_goal': 20,        # выполнил дневную цель по воде
-    'exercise_done': 10,     # выполнил упражнение
-    'exercise_goal': 30,     # выполнил дневную цель по упражнениям
-    'sleep_good': 40,        # хороший сон (≥ 7ч)
-    'sleep_ok': 20,          # нормальный сон (5–7ч)
-    'sleep_short': 5,        # короткий сон (< 5ч, но что-то всё же)
-    'streak_bonus': 15,      # ежедневный заход в бот (раз в день)
-}
-
-# Формула уровня: уровень = 1 + floor(xp / 100)  → каждые 100 XP = +1 уровень
-XP_PER_LEVEL = 100
-
-
-def xp_to_level(xp: int) -> int:
+"""XP, рейтинг и административные действия"""
+def xp_to_level(xp: int, xp_per_level: int) -> int:
     """Вычисляет уровень по количеству XP."""
-    return 1 + xp // XP_PER_LEVEL
+    return 1 + xp // xp_per_level
 
-
-def xp_for_next_level(xp: int) -> int:
+def xp_for_next_level(xp: int, xp_per_level: int) -> int:
     """XP нужно до следующего уровня."""
-    return XP_PER_LEVEL - (xp % XP_PER_LEVEL)
+    return xp_per_level - (xp % xp_per_level)
 
-
-async def add_xp(user_id: int, action: str) -> dict:
+async def add_xp(user_id: int, action: str, xp_rewards: dict[str, int], xp_per_level: int) -> dict:
     """
     Начисляет очки пользователю и обновляет уровень.
     Возвращает dict: {xp_gained, old_level, new_level, total_xp, leveled_up}.
     """
-    gained = XP_REWARDS.get(action, 0)
+    gained = xp_rewards.get(action, 0)
     if gained == 0:
         return {'xp_gained': 0, 'leveled_up': False, 'new_level': 1, 'total_xp': 0, 'old_level': 1}
     async with get_connection() as conn:
@@ -1466,7 +1364,7 @@ async def add_xp(user_id: int, action: str) -> dict:
         else:
             old_xp, old_level = row
         new_xp = old_xp + gained
-        new_level = xp_to_level(new_xp)
+        new_level = xp_to_level(new_xp, xp_per_level)
         await conn.execute('UPDATE user_xp SET xp = ?, level = ? WHERE user_id = ?',
                            (new_xp, new_level, user_id))
         await conn.execute('INSERT INTO xp_log (user_id, action, xp_gained) VALUES (?, ?, ?)',
@@ -1479,14 +1377,12 @@ async def add_xp(user_id: int, action: str) -> dict:
         'leveled_up': new_level > old_level,
     }
 
-
 async def get_user_xp(user_id: int) -> tuple:
     """Возвращает (xp, level)."""
     async with get_connection() as conn:
         cursor = await conn.execute('SELECT xp, level FROM user_xp WHERE user_id = ?', (user_id,))
         row = await cursor.fetchone()
     return (row[0], row[1]) if row else (0, 1)
-
 
 async def get_leaderboard(limit: int = 20) -> list:
     """
@@ -1506,7 +1402,6 @@ async def get_leaderboard(limit: int = 20) -> list:
         rows = await cursor.fetchall()
     return [(i + 1, row[0], row[1], row[2], row[3]) for i, row in enumerate(rows)]
 
-
 async def get_user_rank(user_id: int) -> int | None:
     """Возвращает позицию пользователя в глобальном топе или None."""
     async with get_connection() as conn:
@@ -1518,26 +1413,7 @@ async def get_user_rank(user_id: int) -> int | None:
         row = await cursor.fetchone()
     return (row[0] + 1) if row else None
 
-
-async def search_user(query: str) -> tuple | None:
-    """Поиск пользователя по user_id или username.
-    Возвращает (user_id, username, status, created_date, last_activity, timezone) или None."""
-    async with get_connection() as conn:
-        query = query.strip().lstrip('@')
-        if query.isdigit():
-            cursor = await conn.execute(
-                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE user_id = ?',
-                (int(query),)
-            )
-        else:
-            cursor = await conn.execute(
-                'SELECT user_id, username, status, created_date, last_activity, timezone FROM users WHERE username = ?',
-                (query,)
-            )
-        return await cursor.fetchone()
-
-
-async def admin_set_xp(user_id: int, delta: int) -> int:
+async def admin_set_xp(user_id: int, delta: int, xp_per_level: int) -> int:
     """Прибавляет (или вычитает при delta < 0) XP пользователю.
     Возвращает новое значение XP."""
     async with get_connection() as conn:
@@ -1549,15 +1425,7 @@ async def admin_set_xp(user_id: int, delta: int) -> int:
         else:
             current_xp = row[0]
         new_xp = max(0, current_xp + delta)
-        new_level = xp_to_level(new_xp)
+        new_level = xp_to_level(new_xp, xp_per_level)
         await conn.execute('UPDATE user_xp SET xp = ?, level = ? WHERE user_id = ?', (new_xp, new_level, user_id))
     return new_xp
-
-
-async def is_user_banned(user_id: int) -> bool:
-    """Проверяет, забанен ли пользователь."""
-    async with get_connection() as conn:
-        cursor = await conn.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
-        row = await cursor.fetchone()
-    return row is not None and row[0] == 'BANNED'
 

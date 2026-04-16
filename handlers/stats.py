@@ -46,7 +46,7 @@ async def owner_stats() -> str:
 
 
 async def user_stats(user_id: int) -> str | None:
-    """Получает и форматирует статистику пользователя, возвращает None если данные не найдены."""
+    """Получает и форматирует статистику пользователя, возвращает `None`, если данные не найдены."""
     stats = await get_user_full_stats(user_id)
     if not stats:
         return None

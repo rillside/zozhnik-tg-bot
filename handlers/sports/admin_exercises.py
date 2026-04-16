@@ -145,7 +145,7 @@ async def save_exercise(user_id: int, username: str | None, bot: Any) -> None:
             channel_message_id = None
             if file_id:
                 channel_message_id, new_file_id = await save_media_to_channel(bot, file_id, video_type)
-                # Используем новый file_id из канала, если сохранение прошло успешно
+                # Используем новый `file_id` из канала, если сохранение прошло успешно
                 if channel_message_id and new_file_id:
                     file_id = new_file_id
 
@@ -205,7 +205,7 @@ async def exercise_go_back(call: Any, bot: Any) -> None:
         return
 
     State.set_state(call.message.chat.id, 'adding_exercise', data)
-    await bot.answer_callback_query(call.id, step_back_msg, show_alert=True)
+    await bot.answer_callback_query(call.id, step_back_msg, show_alert=False)
     await bot.edit_message_text(
         text,
         call.message.chat.id,
@@ -278,7 +278,7 @@ async def handle_exercise_category(call: Any, bot: Any) -> None:
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
         return
-    data['category'] = call.data.split('_')[-1]  # например 'strength'
+    data['category'] = call.data.split('_')[-1]  # например, 'strength'
     State.set_state(call.message.chat.id, 'adding_exercise', data)
 
     await bot.edit_message_text(
@@ -295,7 +295,7 @@ async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
     if state != 'adding_exercise':
         await bot.send_message(call.message.chat.id, exercise_add_error)
         return
-    data['difficulty'] = call.data.split('_')[-1]  # например 'beginner'
+    data['difficulty'] = call.data.split('_')[-1]  # например, 'beginner'
     State.set_state(call.message.chat.id, 'adding_exercise', data)
 
     await bot.edit_message_text(
@@ -353,7 +353,7 @@ async def open_video(call: Any, bot: Any, is_moment_of_creation: bool = True) ->
         await bot.answer_callback_query(call.id, 'Видео не прикреплено', show_alert=True)
         return
 
-    # Используем fallback механизм только для существующих упражнений
+    # Используем резервный механизм только для существующих упражнений
     if not is_moment_of_creation and channel_message_id:
         async def update_callback(new_file_id: str) -> None:
             """Обновляет file_id упражнения в БД после пересылки через канал."""
@@ -369,7 +369,7 @@ async def open_video(call: Any, bot: Any, is_moment_of_creation: bool = True) ->
             update_callback=update_callback
         )
     else:
-        # Для новых упражнений просто отправляем без fallback
+        # Для новых упражнений просто отправляем без резервного механизма
         if video_type == 'animation':
             await bot.send_animation(
                 chat_id=call.message.chat.id,
@@ -592,10 +592,10 @@ async def save_exercise_changes(bot: Any, message: Any = None, call: Any = None)
         new_media_type = 'video' if message.video else 'animation'
         # Сохраняем новое видео в канал
         channel_message_id, new_file_id = await save_media_to_channel(bot, new_field, new_media_type)
-        # Используем новый file_id из канала, если сохранение прошло успешно
+        # Используем новый `file_id` из канала, если сохранение прошло успешно
         if channel_message_id and new_file_id:
             new_field = new_file_id
-            # Обновляем channel_message_id
+            # Обновляем `channel_message_id`
             await update_exercise_in_db(ex_id, 'channel_message_id', channel_message_id)
     else:
         return
@@ -657,4 +657,3 @@ async def stats_exercise(call: Any, bot: Any) -> None:
         exercise_stats_msg(stats),
         reply_markup=cancel_any_keyboard()
     )
-

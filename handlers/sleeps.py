@@ -25,6 +25,7 @@ from messages import (
 from utils.xp_helper import award_xp
 
 MIN_SLEEP_MINUTES = 30  # минимальное время сна перед пробуждением
+MAX_SLEEP_MINUTES = 18 * 60
 
 
 async def sleeps_main(message: Any, bot: Any) -> None:
@@ -103,7 +104,7 @@ async def handle_sleep_log_end(call: Any, bot: Any) -> None:
                 return
         except Exception:
             pass
-    result = await log_wake_up(user_id)
+    result = await log_wake_up(user_id, max_sleep_minutes=MAX_SLEEP_MINUTES)
     if result is None:
         await bot.answer_callback_query(call.id, sleep_no_open_session_msg, show_alert=True)
         return

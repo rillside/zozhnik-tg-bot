@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -76,6 +76,7 @@ async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str
     max_char = 3800
     id_ticket = int(id_ticket)
     ticket_info, message_history = await load_info_by_ticket(id_ticket)
+
     if not ticket_info:
         await bot.send_message(message.chat.id, error_ticket_opening_msg)
         return
@@ -202,6 +203,7 @@ async def handling_aggressive_content(call: Any, bot: Any, content_type: str) ->
             await bot.send_message(call.message.chat.id, succ_ticket_title_msg,
                                    reply_markup=supp_ticket_draft_keyboard(id_ticket))
             await new_ticket_notify(bot, id_ticket, call.message.chat.id, type_ticket)
+
         else:
             await bot.send_message(call.message.chat.id, ticket_closed_msg())
     else:
@@ -215,8 +217,15 @@ async def handling_aggressive_content(call: Any, bot: Any, content_type: str) ->
             await opening_ticket(call.message, bot, ticket_id, 'user')
 
 
-async def create_ticket(message: Any, bot: Any, type_ticket: str) -> None:
+async def create_ticket(message: Any, bot: Any, type_ticket: str, last_msg_id: int | None = None) -> None:
     """Создаёт новый тикет поддержки по заголовку из сообщения с проверкой цензуры."""
+    last_msg = State.get_data_only(message.chat.id)
+    if last_msg:
+        try:
+            await bot.delete_message(message.chat.id, last_msg[1])
+        except Exception:
+            pass
+
     if len(message.text) > 50:
         await bot.send_message(message.chat.id, ticket_limit_error_msg())
     else:
@@ -228,6 +237,8 @@ async def create_ticket(message: Any, bot: Any, type_ticket: str) -> None:
             await bot.send_message(message.chat.id, succ_ticket_title_msg,
                                    reply_markup=supp_ticket_draft_keyboard(id_ticket))
             await new_ticket_notify(bot, id_ticket, message.chat.id, type_ticket)
+            State.clear_state(message.chat.id)
+
 
         else:
             await bot.send_message(
@@ -262,7 +273,7 @@ async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, r
             channel_message_id = None
             if type_msg == 'photo' and file_id:
                 channel_message_id, new_file_id = await save_media_to_channel(bot, file_id, 'photo')
-                # Используем новый file_id из канала, если сохранение прошло успешно
+                # Используем новый `file_id` из канала, если сохранение прошло успешно
                 if channel_message_id and new_file_id:
                     file_id = new_file_id
 
@@ -306,7 +317,7 @@ async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, r
 
 
 async def ticket_exit(call: Any, bot: Any) -> None:
-    """Closes the ticket view and returns user to the tickets list."""
+    """Закрывает просмотр тикета и возвращает пользователя к списку тикетов."""
     role = 'admin' if call.data.split('_')[-2] == 'admin' else 'user'
     state, state_data = State.get_state(call.message.chat.id)
     ticket_id = None
@@ -341,7 +352,7 @@ async def ticket_exit(call: Any, bot: Any) -> None:
                                                      await load_tickets_info(call.message.chat.id))
             )
         else:
-            await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=True)
+            await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
     else:
         type_supp = call.data.split('_')[-1]
         if await count_tickets_for_admin(type_supp):
@@ -352,7 +363,7 @@ async def ticket_exit(call: Any, bot: Any) -> None:
                                                            await load_tickets_info(role='admin', type=type_supp)
                                                            ))
         else:
-            await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=True)
+            await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
 
 async def tickets_exit(call: Any, bot: Any) -> None:
     """Закрывает список тикетов и возвращает на главный экран поддержки."""
@@ -408,6 +419,4 @@ async def admin_look_tickets(call: Any, bot: Any) -> None:
                                opening_ticket_keyboard('admin', await load_tickets_info(role='admin', type=type_supp)
                                                        ))
     else:
-        await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=True)
-
-
+        await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)

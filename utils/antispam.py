@@ -7,7 +7,7 @@ _warned_groups: set[str] = set()
 
 
 async def _clear_group_warning(group_id: str, delay: int = 10) -> None:
-    """Удаляет группу из хранилища через delay секунд."""
+    """Удаляет группу из хранилища через указанную задержку в секундах."""
     await asyncio.sleep(delay)
     _warned_groups.discard(group_id)
 

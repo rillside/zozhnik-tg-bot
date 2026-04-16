@@ -29,7 +29,7 @@ async def save_media_to_channel(bot: Any, file_id: str, media_type: str = 'photo
                 chat_id=media_storage_channel_id,
                 photo=file_id
             )
-            # Получаем новый file_id из отправленного сообщения
+            # Получаем новый `file_id` из отправленного сообщения
             new_file_id = sent_message.photo[-1].file_id
         elif media_type == 'video':
             sent_message = await bot.send_video(
@@ -67,10 +67,10 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
                                    reply_markup: Any = None,
                                    update_callback: Callable | None = None) -> Any:
     """
-    Отправляет медиафайл с fallback механизмом.
+    Отправляет медиафайл с резервным сценарием.
 
     Сначала пытается отправить по file_id.
-    Если не получается - пересылает из канала и обновляет file_id через callback.
+    Если не получается - пересылает из канала и обновляет file_id через колбэк.
 
     Приимает:
         bot: Экземпляр бота
@@ -87,7 +87,7 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
         Отправленное сообщение или None при ошибке
     """
 
-    # Сначала пробуем отправить по file_id
+    # Сначала пробуем отправить по `file_id`
     try:
         if media_type == 'photo':
             sent_message = await bot.send_photo(
@@ -128,14 +128,14 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
                     caption=caption,
                     reply_markup=reply_markup
                 )
-                _logger.debug("Медиа отправлено по file_id как animation")
+                _logger.debug("Медиа отправлено по file_id как анимация")
                 return sent_message
             except Exception:
                 pass
 
-        # Если не удалось отправить по file_id, пробуем через канал
+        # Если не удалось отправить по `file_id`, пробуем через канал
         if not channel_message_id:
-            _logger.error("channel_message_id отсутствует, невозможно получить медиа из канала")
+            _logger.error("`channel_message_id` отсутствует, невозможно получить медиа из канала")
             return None
 
         try:
@@ -148,7 +148,7 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
                 reply_markup=reply_markup
             )
 
-            # Получаем актуальное сообщение из канала для извлечения нового file_id
+            # Получаем актуальное сообщение из канала для извлечения нового `file_id`
             channel_message = await bot.forward_message(
                 chat_id=chat_id,
                 from_chat_id=media_storage_channel_id,
@@ -161,7 +161,7 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
             except Exception:
                 pass
 
-            # Извлекаем новый file_id
+            # Извлекаем новый `file_id`
             if media_type == 'photo' and channel_message.photo:
                 new_file_id = channel_message.photo[-1].file_id
             elif media_type in ('video', 'animation'):
@@ -177,7 +177,7 @@ async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel
                 _logger.error("Не удалось извлечь file_id из сообщения канала")
                 return copied_message
 
-            # Обновляем file_id в БД, если передан callback
+            # Обновляем `file_id` в БД, если передан колбэк-запрос
             if update_callback:
                 try:
                     await update_callback(new_file_id)

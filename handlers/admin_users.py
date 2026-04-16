@@ -1,4 +1,4 @@
-"""Управление пользователями для администраторов."""
+﻿"""Управление пользователями для администраторов."""
 from typing import Any
 from database import search_user, replace_status, admin_set_xp, get_user_xp, get_user_rank
 from keyboards import user_profile_admin_keyboard, admin_search_cancel, admin_xp_cancel_keyboard
@@ -8,9 +8,11 @@ from messages import (
 )
 from utils.fsm import State
 
+XP_PER_LEVEL = 100
+
 
 async def _safe_delete(bot: Any, chat_id: int, msg_id: int | None) -> None:
-    """Удаляет сообщение без исключений, игнорируя ошибки (msg_id None-safe)."""
+    """Удаляет сообщение без исключений, игнорируя ошибки (например, если сообщение уже удалено)."""
     if not msg_id:
         return
     try:
@@ -20,7 +22,7 @@ async def _safe_delete(bot: Any, chat_id: int, msg_id: int | None) -> None:
 
 
 async def _send_search_prompt(chat_id: int, bot: Any) -> None:
-    """Отправляет строку поиска и сохраняет msg_id в FSM."""
+    """Отправляет строку поиска и сохраняет ID сообщения в FSM."""
     sent = await bot.send_message(
         chat_id,
         "🔍 <b>Поиск пользователя</b>\n\nВведите ID или @username:",
@@ -30,7 +32,7 @@ async def _send_search_prompt(chat_id: int, bot: Any) -> None:
 
 
 async def _show_user_profile_by_id(chat_id: int, user_id: int, bot: Any) -> None:
-    """Загружает и отправляет карточку профиля по user_id."""
+    """Загружает и отправляет карточку профиля по ID пользователя."""
     row = await search_user(str(user_id))
     if not row:
         await bot.send_message(chat_id, user_search_not_found_msg(str(user_id)))
@@ -187,7 +189,7 @@ async def admin_xp_input(message: Any, bot: Any) -> None:
     State.clear_state(message.chat.id)
     amount = int(text)
     delta = amount if action == 'add' else -amount
-    new_xp = await admin_set_xp(user_id, delta)
+    new_xp = await admin_set_xp(user_id, delta, xp_per_level=XP_PER_LEVEL)
 
     # удаляем промпт ввода (бот-сообщение)
     await _safe_delete(bot, message.chat.id, prompt_msg_id)

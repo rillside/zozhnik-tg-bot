@@ -90,7 +90,7 @@ def return_admin_rights() -> types.InlineKeyboardMarkup:
 
 
 def accept_send(type_broadcast: str = 'msg') -> types.InlineKeyboardMarkup:
-    """Клавиатура подтверждения/отмены рассылки."""
+    """Клавиатура подтверждения или отмены рассылки."""
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Отправить рассылку", callback_data=f'br_accept_{type_broadcast}')
     btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку", callback_data=f'br_cancel')
@@ -626,7 +626,7 @@ def no_exercises_keyboard() -> types.InlineKeyboardMarkup:
     return keyboard
 
 
-# keyboards.py
+# Клавиатуры бота
 
 def exercise_edit_keyboard(exercise_id: int, category: str, difficulty: str, has_video: bool = False) -> types.InlineKeyboardMarkup:
     """Клавиатура редактирования полей конкретного упражнения."""

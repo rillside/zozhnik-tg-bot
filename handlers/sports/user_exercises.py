@@ -47,7 +47,7 @@ from utils.xp_helper import award_xp
 
 def check_can_log_exercise(last_log: tuple | None, exercise_id: int) -> tuple[bool, tuple | None]:
     """
-    Логика проверки лимитов времени.
+    Проверяет лимиты по времени.
     - Одно и то же упражнение: не чаще раза в 15 минут.
     - Разные упражнения: не чаще раза в 5 минут.
     last_log: (exercise_id, time) или None.
@@ -305,7 +305,7 @@ async def sports_cancel_done(call: Any, bot: Any) -> None:
 
 
 async def sports_show_exercise_for_ex_id(call: Any, bot: Any, ex_id: int) -> None:
-    """Показывает карточку упражнения по ex_id (для возврата из подтверждения/отмены)."""
+    """Показывает карточку упражнения по ex_id (для возврата из подтверждения или отмены)."""
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
         await bot.answer_callback_query(call.id, sports_not_found_ex_msg, show_alert=True)

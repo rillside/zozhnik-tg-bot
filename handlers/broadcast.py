@@ -6,16 +6,20 @@ from typing import Any
 from utils.censorship.checker import censor_check, removal_of_admin_rights
 from utils.fsm import State
 from utils.rate_limit_send import rate_limited_gather
-import re
 
 
-def escape_md(text: str) -> str:
-    """Экранирует спецсимволы для обычного Markdown."""""
-    return re.sub(r'([_*`\[])', r'\\\1', str(text))
+
+
 
 
 async def accept_broadcast(message: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
     """Показывает предпросмотр рассылки и запрашивает подтверждение перед отправкой."""
+    last_message_id = State.get_data_only(message.chat.id)
+    if last_message_id:
+        try:
+            await bot.delete_message(message.chat.id, last_message_id)
+        except:
+            pass
     if type_broadcast == 'msg':
         if message.text.strip():
             await bot.send_message(message.chat.id, f"📋 Предпросмотр:\n{message.text}", reply_markup=accept_send())
@@ -37,8 +41,7 @@ async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo
         message = call.message.text.split(':', 1)[1].strip()
     else:
         message = caption.strip()
-    safe_message = escape_md(message)
-    safe_sender = escape_md(sender)
+
 
     if await censor_check(message):
         State.clear_state(call.message.chat.id)
@@ -47,7 +50,7 @@ async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo
             coros = [
                 bot.send_message(
                     user_id,
-                    safe_message + (f"\n\n📨 Отправитель: {safe_sender}" if is_owner(user_id) else ''),
+                    message + (f"\n\n📨 Отправитель: {sender}" if is_owner(user_id) else ''),
                     parse_mode=None,
                 )
                 for user_id in users
@@ -57,7 +60,7 @@ async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo
                 bot.send_photo(
                     chat_id=user_id,
                     photo=photo_id,
-                    caption=safe_message + (f"\n\n📨 Отправитель: {safe_sender}" if is_owner(user_id) else ''),
+                    caption=message + (f"\n\n📨 Отправитель: {sender}" if is_owner(user_id) else ''),
                     parse_mode=None,
                 )
                 for user_id in users

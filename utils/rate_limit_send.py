@@ -6,14 +6,14 @@ from typing import Any
 Утилита для rate-limited рассылки с использованием asyncio.gather и semaphore.
 """
 
-# Ограничение параллельных отправок для соблюдения rate limit Telegram
+# Ограничение параллельных отправок для соблюдения лимитов Телеграма
 SEMAPHORE_LIMIT = 15
 
 _logger = logging.getLogger(__name__)
 
 
 async def _send_with_semaphore(semaphore: asyncio.Semaphore, coro: Any) -> bool | None:
-    """Выполняет корутину отправки с учётом semaphore."""
+    """Выполняет корутину отправки с учётом семафора."""
     async with semaphore:
         try:
             await coro
@@ -26,7 +26,7 @@ async def _send_with_semaphore(semaphore: asyncio.Semaphore, coro: Any) -> bool 
 
 async def rate_limited_gather(send_coroutines: list) -> tuple[int, int]:
     """
-    Выполняет список корутин отправки с ограничением через semaphore.
+    Выполняет список корутин отправки с ограничением через семафор.
 
     Args:
         send_coroutines: список корутин (например, bot.send_message(...))

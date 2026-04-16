@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -91,7 +91,7 @@ class Scheduler:
         await self._cleanup_stale_ticket_locks()
 
     async def _cleanup_stale_ticket_locks(self) -> None:
-        """Cleans stale ticket locks every 20 minutes."""
+        """Очищает устаревшие блокировки тикетов каждые 20 минут."""
         now = datetime.utcnow()
         if now - self._last_ticket_lock_cleanup < timedelta(minutes=20):
             return
@@ -150,12 +150,12 @@ class Scheduler:
                 return
             current_goal, water_drunk = await water_stats(user_id)
             await self.bot.send_message(user_id, water_quick_reminder_msg(current_goal, water_drunk))
-            _logger.info(f"Отправлено напоминание user_id={user_id}")
+            _logger.info(f"Отправлено напоминание ID пользователя={user_id}")
             await update_reminder_sent_time(user_id)
             await update_last_notification(user_id)
 
         except Exception as e:
-            _logger.error(f" Ошибка отправки напоминания user_id={user_id}: {e}")
+            _logger.error(f"Ошибка отправки напоминания ID пользователя={user_id}: {e}")
 
     async def _check_activity_reminders(self, quiet_hours: dict | None = None) -> None:
         """Определяет пользователей, которым нужно напомнить об активности, и рассылает напоминания."""
@@ -198,11 +198,11 @@ class Scheduler:
             if goal is None:
                 return
             await self.bot.send_message(user_id, activity_quick_reminder_msg(today_count, goal))
-            _logger.info(f"Отправлено напоминание активности user_id={user_id}")
+            _logger.info(f"Отправлено напоминание активности ID пользователя={user_id}")
             await update_activity_reminder_sent_time(user_id)
             await update_last_notification(user_id)
         except Exception as e:
-            _logger.error(f"Ошибка отправки напоминания активности user_id={user_id}: {e}")
+            _logger.error(f"Ошибка отправки напоминания активности ID пользователя={user_id}: {e}")
 
     async def _check_inactive_users_reminders(self, quiet_hours: dict | None = None) -> None:
         """Отправляет мотивационные напоминания давно неактивным пользователям."""
@@ -225,9 +225,9 @@ class Scheduler:
             await self.bot.send_message(user_id, activity_inactive_reminder_msg)
             await update_last_inactivity_reminder(user_id)
             await update_last_notification(user_id)
-            _logger.info(f"Отправлено напоминание неактивному user_id={user_id}")
+            _logger.info(f"Отправлено напоминание неактивному ID пользователя={user_id}")
         except Exception as e:
-            _logger.error(f"Ошибка напоминания неактивному user_id={user_id}: {e}")
+            _logger.error(f"Ошибка напоминания неактивному ID пользователя={user_id}: {e}")
 
     async def _check_sleep_reminders(self) -> None:
         """Проверяет и рассылает напоминания об отбое и подъёме согласно расписанию каждого пользователя."""
@@ -282,9 +282,9 @@ class Scheduler:
                             await update_sleep_last_sleep_reminder(user_id)
                             await update_last_notification(user_id)
                             last_notif_dt = now_utc  # обновляем локально для следующей проверки
-                            _logger.info(f"Sleep reminder sent to user_id={user_id}")
+                            _logger.info(f"Отправлено напоминание об отбое ID пользователя={user_id}")
                         except Exception as e:
-                            _logger.error(f"Sleep reminder error user_id={user_id}: {e}")
+                            _logger.error(f"Ошибка напоминания об отбое ID пользователя={user_id}: {e}")
 
             # Окно напоминания "доброе утро": [wake_time - 5, wake_time + 5]
             wake_window_start = (wake_min - 5) % 1440
@@ -296,7 +296,7 @@ class Scheduler:
                         # Отправляем уведомление о пробуждении только если есть активная сессия сна
                         open_session = await get_open_sleep_session(user_id)
                         if open_session is None:
-                            _logger.info(f"Wake reminder skipped (no open session) user_id={user_id}")
+                            _logger.info(f"Пропущено напоминание о подъёме (нет открытой сессии сна) ID пользователя={user_id}")
                         else:
                             try:
                                 await self.bot.send_message(
@@ -306,16 +306,16 @@ class Scheduler:
                                 )
                                 await update_sleep_last_wake_reminder(user_id)
                                 await update_last_notification(user_id)
-                                _logger.info(f"Wake reminder sent to user_id={user_id}")
+                                _logger.info(f"Отправлено напоминание о подъёме ID пользователя={user_id}")
                             except Exception as e:
-                                _logger.error(f"Wake reminder error user_id={user_id}: {e}")
+                                _logger.error(f"Ошибка напоминания о подъёме ID пользователя={user_id}: {e}")
 
     @staticmethod
     async def _check_weekly_water_reset() -> None:
         """Запускает еженедельный сброс водной статистики для пользователей, у которых наступил новый понедельник."""
         users = await fetch_water_stats_all()
-        for user_id, goal_ml,timezone, Monday, Tuesday, \
-                Wednesday, Thursday, Friday, Saturday, Sunday, last_reset_str in users:
+        for user_id, goal_ml,timezone, _, _, \
+                _, _, _, _, _, last_reset_str in users:
             if goal_ml is None:
                 continue
             last_reset = datetime.strptime(last_reset_str, '%Y-%m-%d').date() if last_reset_str else None

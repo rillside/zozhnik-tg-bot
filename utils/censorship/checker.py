@@ -10,23 +10,23 @@ from config import ai_censor_enabled, censorship_threshold, is_owner, owners, sa
 _logger = logging.getLogger(__name__)
 toxicity_checker = None
 async def censor_load() -> None:
-    """Загружает AI-модель цензуры (Detoxify), если она включена в конфигурации."""
+    """Загружает ИИ-модель цензуры (Detoxify), если она включена в конфигурации."""
     global toxicity_checker
     if ai_censor_enabled:
         try:
-            _logger.info("Начата загрузка AI модели...")
+            _logger.info("Начата загрузка ИИ-модели...")
             from detoxify import Detoxify
             toxicity_checker = Detoxify('original')  # Модель unitary/toxic-bert
-            _logger.info("AI Модель загружена")
+            _logger.info("ИИ-модель загружена")
         except Exception as e:
-            _logger.warn(f"Ошибка загрузки Detoxify. AI цензура отключена\n{e}")
+            _logger.warn(f"Ошибка загрузки Detoxify. ИИ-цензура отключена\n{e}")
             toxicity_checker = None
     else:
         toxicity_checker = None
-        _logger.info("AI цензура отключена")
+        _logger.info("ИИ-цензура отключена")
 
 async def ai_censor(text: str) -> bool:
-    """Проверяет текст через AI-модель. Возвращает True, если текст превышает порог токсичности."""
+    """Проверяет текст через ИИ-модель. Возвращает `True`, если текст превышает порог токсичности."""
 
     if toxicity_checker is None:
         return False
@@ -40,12 +40,12 @@ async def ai_censor(text: str) -> bool:
         )
         return any(score > censorship_threshold for score in result.values())
     except Exception as e:
-        _logger.warn(f"Ошибка при работе AI цензуры: {e}")
+        _logger.warn(f"Ошибка при работе ИИ-цензуры: {e}")
         return False
 
 
 async def censor_check(text: str) -> bool:
-    """Проверяет текст на наличие запрещённых слов, фраз и AI-токсичности. Возвращает True, если текст прошёл проверку."""
+    """Проверяет текст на наличие запрещённых слов, фраз и ИИ-токсичности. Возвращает `True`, если текст прошёл проверку."""
     words = set(re.sub(r'[^\w\s]', ' ', text.lower()).split())
     if any(i in words for i in banned_words):
         return False

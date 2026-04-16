@@ -2,7 +2,7 @@ from typing import Any
 
 
 class State:
-    """Конечного автомат для пользовательских состояний."""
+    """Конечный автомат для пользовательских состояний."""
 
     user_states: dict[int, dict[str, Any]] = {}
 
@@ -13,6 +13,23 @@ class State:
             cls.user_states[user_id] = {}
         cls.user_states[user_id]["state"] = state
         cls.user_states[user_id]["data"] = data
+
+        
+    @staticmethod
+    def get_data_only(user_id: int) -> Any:
+        """Возвращает только данные для пользователя или None."""
+        if user_id not in State.user_states:
+            return None
+        return State.user_states[user_id].get("data")
+
+
+    @staticmethod
+    def set_data(user_id: int, data: Any) -> None:
+        """Обновляет только данные для пользователя, не изменяя состояние."""
+        if user_id not in State.user_states:
+            State.user_states[user_id] = {"state": None, "data": data}
+        else:
+            State.user_states[user_id]["data"] = data
 
     @classmethod
     def clear_state(cls, user_id: int) -> None:
@@ -30,7 +47,7 @@ class State:
 
     @classmethod
     def get_state(cls, user_id: int) -> tuple[str | None, Any]:
-        """Возвращает (state, data) для пользователя или (None, None)."""
+        """Возвращает `(состояние, данные)` для пользователя или `(None, None)`."""
         if user_id not in cls.user_states:
             return None, None
         state_data = cls.user_states[user_id]

@@ -77,7 +77,7 @@ async def water_smart_type_install(call: Any, bot: Any) -> None:
 
 
 async def water_setting_interval(call: Any, bot: Any, step: str) -> None:
-    """Устанавливает интервал напоминаний о воде или возвращается назад (степ: install / exit)."""
+    """Устанавливает интервал напоминаний о воде или возвращается назад (шаг: `install` / `exit`)."""
     if step == 'exit':
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -128,7 +128,7 @@ async def water_goal_custom_stg(bot: Any, message: Any, call: Any, send_msg: Any
 
 
 async def water_goal_settings(call: Any, bot: Any, step: str) -> None:
-    """Диспетчер действий с целью воды: установка, произвольный ввод, выход или отмена (step)."""
+    """Диспетчер действий с целью воды: установка, произвольный ввод, выход или отмена (шаг)."""
     if step == 'set_goal':
         goal_ml = int(call.data.split('_')[-1])
         await update_water_goal(call.from_user.id, goal_ml)
@@ -212,7 +212,7 @@ async def activity_interval_open(call: Any, bot: Any) -> None:
 
 
 async def activity_setting_interval(call: Any, bot: Any, step: str) -> None:
-    """Устанавливает интервал напоминаний об активности или возвращается назад (step: install / exit)."""
+    """Устанавливает интервал напоминаний об активности или возвращается назад (шаг: `install` / `exit`)."""
     if step == 'exit':
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
         await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -234,7 +234,7 @@ async def activity_setting_interval(call: Any, bot: Any, step: str) -> None:
 
 
 async def activity_goal_settings(call: Any, bot: Any, step: str) -> None:
-    """Диспетчер действий с целью активности: установка, произвольный ввод, выход или отмена (step)."""
+    """Диспетчер действий с целью активности: установка, произвольный ввод, выход или отмена (шаг)."""
     if step == 'set_goal':
         goal = int(call.data.split('_')[-1])
         await update_activity_goal(call.from_user.id, goal)
@@ -319,7 +319,7 @@ async def activity_stg_cancel(call: Any, bot: Any) -> None:
 # Настройки трекера сна
 
 def _parse_time(text: str) -> str | None:
-    """Валидирует и возвращает время HH:MM или None."""
+    """Проверяет и возвращает время в формате HH:MM или `None`."""
     text = text.strip()
     parts = text.split(':')
     if len(parts) != 2:
@@ -509,5 +509,4 @@ async def sleep_custom_time_cancel(call: Any, bot: Any) -> None:
         sleep_tracker_setup_msg(call.from_user.first_name, sleep_time, wake_time, reminders_enabled),
         reply_markup=sleep_setup_keyboard(reminders_enabled)
     )
-
 

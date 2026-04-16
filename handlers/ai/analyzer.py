@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from datetime import datetime
 from typing import Any
 
@@ -96,12 +96,12 @@ async def ai_analyze_profile(call: Any, bot: Any) -> None:
 
     # Формируем профиль и вызываем Ollama
     profile_text = _build_profile_text(stats, first_name)
-    _logger.info(f"AI-анализ запрошен для user_id={user_id}")
+    _logger.info(f"AI-анализ запрошен для ID пользователя={user_id}")
 
     result = await ask_ollama(SYSTEM_PROMPT, profile_text)
 
     if result is None:
         await bot.send_message(call.message.chat.id, ai_analyze_off_msg, show_alert=True)
     else:
-        _logger.info(f"AI-анализ успешно выполнен для user_id={user_id}, символов: {len(result)}")
+        _logger.info(f"AI-анализ успешно выполнен для ID пользователя={user_id}, символов: {len(result)}")
         await bot.send_message(user_id, result, parse_mode=None)

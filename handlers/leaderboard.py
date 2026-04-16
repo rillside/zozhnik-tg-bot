@@ -5,7 +5,7 @@ from typing import Any
 
 
 async def show_leaderboard(source: Any, bot: Any) -> None:
-    """Показывает таблицу лидеров; source может быть message или call."""
+    """Показывает таблицу лидеров; источником может быть сообщение или колбэк-запрос."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id
         send = lambda text, kb: bot.send_message(user_id, text, reply_markup=kb)
@@ -23,7 +23,7 @@ async def show_leaderboard(source: Any, bot: Any) -> None:
 
 
 async def show_xp_profile(source: Any, bot: Any) -> None:
-    """Показывает XP-профиль пользователя; source может быть message или call."""
+    """Показывает XP-профиль пользователя; источником может быть сообщение или колбэк-запрос."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id
         first_name = source.from_user.first_name
