@@ -293,8 +293,8 @@ bot/
 ### 1) Клонирование
 
 ```bash
-git clone <repo_url>
-cd bot
+git clone https://github.com/rillside/zozhnik-tg-bot
+cd zozhnik-tg-bot
 ```
 
 ### 2) Виртуальное окружение
