@@ -211,7 +211,6 @@ FSM реализована в `utils/fsm.py`:
 Практические особенности:
 - включены `FOREIGN KEY` связи;
 - логовая модель в трекерах позволяет восстанавливать статистику;
-- структура позволяет расширять функционал без критических миграций.
 
 ---
 
@@ -244,47 +243,47 @@ FSM реализована в `utils/fsm.py`:
 
 ```text
 bot/
-├─ main.py
-├─ config.py
-├─ database.py
-├─ keyboards.py
-├─ messages.py
-├─ requirements.txt
-├─ owners.json
+├─ main.py - точка входа
+├─ config.py - настройка проекта
+├─ database.py - взаимодействие с БД
+├─ keyboards.py - клавиатуры
+├─ messages.py - сообщения
+├─ requirements.txt - зависимости
+├─ owners.json - владельцы
 ├─ handlers/
 │  ├─ routers/
-│  │  ├─ callback_router.py
-│  │  ├─ fsm_router.py
-│  │  └─ message_router.py
-│  ├─ admin_notifications.py
-│  ├─ admin_users.py
-│  ├─ broadcast.py
-│  ├─ leaderboard.py
-│  ├─ owner_menu.py
-│  ├─ settings.py
-│  ├─ sleeps.py
-│  ├─ stats.py
-│  ├─ water.py
+│  │  ├─ callback_router.py - маршрутизатор коллбеков
+│  │  ├─ fsm_router.py - маршрутизатор действий при активном State
+│  │  └─ message_router.py - маршрутизатор сообщений
+│  ├─ admin_notifications.py - уведолмления администрации
+│  ├─ admin_users.py - управление пользователями
+│  ├─ broadcast.py - рассылка
+│  ├─ leaderboard.py - топ игроков
+│  ├─ owner_menu.py - меню владельца
+│  ├─ settings.py - пользовательские настройки
+│  ├─ sleeps.py - трекер сна
+│  ├─ stats.py - обработчик статистики
+│  ├─ water.py - трекер воды
 │  ├─ ai/
-│  │  ├─ analyzer.py
-│  │  ├─ client.py
-│  │  └─ promts.py
+│  │  ├─ analyzer.py - конвертирует все данные в текст и отправляет запрос модели
+│  │  ├─ client.py - клиент подключения к модели
+│  │  └─ promts.py - промт
 │  ├─ sports/
-│  │  ├─ admin_exercises.py
-│  │  └─ user_exercises.py
+│  │  ├─ admin_exercises.py - админ логика физ. упражнений
+│  │  └─ user_exercises.py - пользовательская логика физ. упражнений
 │  └─ support/
-│     ├─ support.py
-│     └─ ticket_sorting.py
+│     ├─ support.py - обработчик тех поддержки
+│     └─ ticket_sorting.py - сортировка тикетов
 └─ utils/
-   ├─ antispam.py
-   ├─ fsm.py
-   ├─ media_storage.py
-   ├─ rate_limit_send.py
-   ├─ scheduler.py
-   ├─ xp_helper.py
+   ├─ antispam.py - защита от медиа-групп, в будущем полноценный антиспам
+   ├─ fsm.py - Конечный автомат
+   ├─ media_storage.py - базовая работа с медиа и fallback-механизм отправки
+   ├─ rate_limit_send.py - Отправка рассылок с соблюдением лимитом
+   ├─ scheduler.py - планировщик задач
+   ├─ xp_helper.py - обработчик XP
    └─ censorship/
-      ├─ checker.py
-      └─ word_filter.py
+      ├─ checker.py - Проверка цензуры
+      └─ word_filter.py - Множество запрещенных слов и фраз
 ```
 
 ---
@@ -327,7 +326,7 @@ pip install -r requirements.txt
 Пример:
 
 ```json
-[6295868318]
+[123456789]
 ```
 
 `owners.json` определяет пользователей с ролью владельца (Owner), которым доступны операции управления администраторами.
@@ -336,7 +335,7 @@ pip install -r requirements.txt
 
 ```env
 TOKEN_BOT=your_telegram_bot_token
-MEDIA_STORAGE_CHANNEL_ID=-1001234567890
+MEDIA_STORAGE_CHANNEL_ID=your_media_storage_chennel_id
 ```
 
 Пояснение:
@@ -365,13 +364,7 @@ python main.py
 - `ai_censor_enabled` — включение AI-цензуры.
 - `ai_analyzer_enabled` — включение AI-анализа профиля.
 - `censorship_threshold` — порог токсичности для AI-проверки.
-- `owners` / `owners_copy` — список владельцев из `owners.json`.
 
-Также в `config.py` находится проверка ролей:
-- `is_admin(...)`;
-- `is_owner(...)`.
-
----
 
 ## Лицензия
 
