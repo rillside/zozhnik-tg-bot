@@ -60,7 +60,7 @@ def error_handler(func: Callable) -> Callable:
 
 
 @bot.message_handler(commands=['start'])
-# @error_handler
+@error_handler
 async def start(message: telebot.types.Message) -> None:
     """Обрабатывает команду /start: регистрирует пользователя и показывает главное меню или выбор часового пояса."""
     State.clear_state(message.chat.id)
@@ -110,7 +110,7 @@ async def handle_video_with_state(message: telebot.types.Message) -> None:
 
 
 @bot.message_handler(content_types=['text'])
-# @error_handler
+@error_handler
 async def msg(message: telebot.types.Message) -> None:
     """Обрабатывает обычные текстовые сообщения."""
     await update_username(message.chat.id, message.from_user.username, bot)
