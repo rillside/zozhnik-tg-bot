@@ -1,8 +1,10 @@
+import telebot
+from telebot.async_telebot import AsyncTeleBot
+
 from config import is_owner
 from database import all_users
 from keyboards import accept_send
 from messages import broadcast_stats
-from typing import Any
 from utils.censorship.checker import censor_check, removal_of_admin_rights
 from utils.fsm import State
 from utils.rate_limit_send import rate_limited_gather
@@ -12,7 +14,10 @@ from utils.rate_limit_send import rate_limited_gather
 
 
 
-async def accept_broadcast(message: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
+async def accept_broadcast(message: telebot.types.Message, bot: AsyncTeleBot,
+                           type_broadcast: str = 'msg',
+                           photo_id: str | None = None,
+                           caption: str | None = None) -> None:
     """Показывает предпросмотр рассылки и запрашивает подтверждение перед отправкой."""
     last_message_id = State.get_data_only(message.chat.id)
     if last_message_id:
@@ -32,7 +37,10 @@ async def accept_broadcast(message: Any, bot: Any, type_broadcast: str = 'msg', 
         State.set_state(message.chat.id, 'waiting_broadcast_accept', [photo_id, caption])
 
 
-async def broadcast_send(call: Any, bot: Any, type_broadcast: str = 'msg', photo_id: str | None = None, caption: str | None = None) -> None:
+async def broadcast_send(call: telebot.types.CallbackQuery, bot: AsyncTeleBot,
+                         type_broadcast: str = 'msg',
+                         photo_id: str | None = None,
+                         caption: str | None = None) -> None:
     """Рассылает сообщение от админа всем пользователям с проверкой цензуры."""
     sender_id = call.message.chat.id
     sender_username = call.from_user.username

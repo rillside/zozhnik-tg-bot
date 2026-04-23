@@ -1,10 +1,11 @@
 import json
+import logging
 import os
 
 from dotenv import load_dotenv
 
 from database import get_user_status
-
+logger = logging.getLogger(__name__)
 
 # Управление владельцами
 
@@ -14,7 +15,7 @@ def load_owners() -> list:
         with open('owners.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"⚠️ Ошибка загрузки owners.json: {e}. Создаю файл с пустым списком.")
+        logger.warning(f"⚠️ Ошибка загрузки owners.json: {e}. Создаю файл с пустым списком.")
         with open('owners.json', 'w', encoding='utf-8') as f:
             json.dump([], f)
         return []

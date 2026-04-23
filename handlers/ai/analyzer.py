@@ -1,6 +1,8 @@
 ﻿import logging
 from datetime import datetime
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import get_user_full_stats
 from .client import ask_ollama
@@ -69,7 +71,7 @@ def _build_profile_text(stats: dict, first_name: str) -> str:
     return "\n".join(lines)
 
 
-async def ai_analyze_profile(call: Any, bot: Any) -> None:
+async def ai_analyze_profile(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает нажатие кнопки «ИИ-анализ профиля»: собирает статистику, вызывает Ollama и отправляет анализ."""
     if not ai_analyzer_enabled:
         await bot.answer_callback_query(call.id, ai_analyze_off_msg, show_alert=True)

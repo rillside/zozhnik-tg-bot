@@ -1,7 +1,8 @@
 ﻿import asyncio
 import logging
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import date, datetime, timedelta
+
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     add_water_ml,
@@ -42,7 +43,7 @@ _logger = logging.getLogger(__name__)
 
 
 class Scheduler:
-    def __init__(self, bot: Any) -> None:
+    def __init__(self, bot: AsyncTeleBot) -> None:
         """Инициализирует планировщик с экземпляром бота."""
         self.bot = bot
         self.running = False
@@ -341,35 +342,19 @@ class Scheduler:
                 await Scheduler._weekly_water_reset(user_id, last_monday, lost_records)
 
     @staticmethod
-    async def _weekly_water_reset(user_id: int, last_monday: Any, lost_records: int) -> None:
+    async def _weekly_water_reset(user_id: int, last_monday: date, lost_records: int) -> None:
         """Выполняет еженедельный сброс водной статистики: обновляет дату сброса, обнуляет недельные данные и восстанавливает потерянные записи."""
         try:
-            # 1. Обновляем дату последнего сброса
-            try:
-                await set_last_reset_water(user_id, last_monday)
-                _logger.info(f"Пользователь {user_id}: дата сброса обновлена на {last_monday}")
-            except Exception as e:
-                _logger.error(f"Пользователь {user_id}: ошибка обновления даты сброса - {e}")
-                raise
+            await set_last_reset_water(user_id, last_monday)
+            _logger.info(f"Пользователь {user_id}: дата сброса обновлена на {last_monday}")
 
-            # 2. Сбрасываем недельную статистику
-            try:
-                await water_reset(user_id)
-                _logger.info(f"Пользователь {user_id}: недельная статистика обнулена")
-            except Exception as e:
-                _logger.error(f"Пользователь {user_id}: ошибка сброса статистики - {e}")
-                raise
+            await water_reset(user_id)
+            _logger.info(f"Пользователь {user_id}: недельная статистика обнулена")
 
-            # 3. Восстанавливаем потерянные записи
             if lost_records > 0:
-                try:
-                    await add_water_ml(user_id, lost_records,add_total=False)
-                    _logger.info(f"Пользователь {user_id}: восстановлено {lost_records} мл за период сброса")
-                except Exception as e:
-                    _logger.error(f"Пользователь {user_id}: ошибка восстановления {lost_records} мл - {e}")
-            else:
-                _logger.info(f"Пользователь {user_id}: потерянных записей не найдено")
+                await add_water_ml(user_id, lost_records, add_total=False)
+                _logger.info(f"Пользователь {user_id}: восстановлено {lost_records} мл за период сброса")
 
         except Exception as e:
-            _logger.error(f"Пользователь {user_id}: критическая ошибка при сбросе - {e}")
+            _logger.error(f"Пользователь {user_id}: ошибка при еженедельном сбросе — {e}")
 

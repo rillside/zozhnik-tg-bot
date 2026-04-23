@@ -14,7 +14,7 @@ class State:
         cls.user_states[user_id]["state"] = state
         cls.user_states[user_id]["data"] = data
 
-        
+
     @staticmethod
     def get_data_only(user_id: int) -> Any:
         """Возвращает только данные для пользователя или None."""
@@ -31,13 +31,13 @@ class State:
         else:
             State.user_states[user_id]["data"] = data
 
-    @classmethod
-    def clear_state(cls, user_id: int) -> None:
+    @staticmethod
+    def clear_state(user_id: int) -> None:
         """Полностью удаляет состояние пользователя."""
-        if user_id in cls.user_states:
-            del cls.user_states[user_id]
+        if user_id in State.user_states:
+            del State.user_states[user_id]
 
-    @classmethod
+    @staticmethod
     def clear_state_keep_data(cls, user_id: int) -> None:
         """Сбрасывает состояние, оставляя сохраненные данные."""
         if user_id not in cls.user_states:

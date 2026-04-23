@@ -1,5 +1,8 @@
 ﻿import re
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
+
 from config import is_admin, owners_copy
 from database import is_user_valid, get_all_admin, get_user_status, \
     get_id_by_username, replace_status
@@ -12,7 +15,7 @@ from messages import  user_nf, user_already_admin, success_new_admin, owner_demo
 from utils.fsm import State
 
 
-async def add_admin(msg: Any, bot: Any) -> None:
+async def add_admin(msg: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает ввод владельца: выдаёт права админа указанному пользователю (по ID или @username)."""
     if msg.text.strip().isdigit():
         clean_user_id = msg.text.strip()
@@ -50,7 +53,7 @@ async def add_admin(msg: Any, bot: Any) -> None:
 
 
 
-async def remove_admin(msg: Any, bot: Any) -> None:
+async def remove_admin(msg: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает ввод владельца: снимает права админа у указанного пользователя (по ID или @username)."""
     if msg.text.strip().isdigit():
         clean_user_id = msg.text.strip()
@@ -97,7 +100,7 @@ async def remove_admin(msg: Any, bot: Any) -> None:
             await bot.send_message(msg.chat.id, user_nf,reply_markup=own_cancel())
     else:
         await bot.send_message(msg.chat.id, incorrect_format_adm_msg,reply_markup=own_cancel())
-async def return_admin(call: Any, bot: Any) -> None:
+async def return_admin(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Восстанавливает права админа пользователю, лишённому их за нарушение цензуры."""
     user_id = int(re.search(r'ID Нарушителя: (\d+)', call.message.text).group(1))
     if user_id in owners_copy:

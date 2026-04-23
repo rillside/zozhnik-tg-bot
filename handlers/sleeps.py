@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     get_last_sleep_log,
@@ -28,7 +30,7 @@ MIN_SLEEP_MINUTES = 30  # минимальное время сна перед п
 MAX_SLEEP_MINUTES = 18 * 60
 
 
-async def sleeps_main(message: Any, bot: Any) -> None:
+async def sleeps_main(message: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Отображает дашборд трекера сна: текущее состояние, последнюю сессию и среднюю продолжительность."""
     user_id = message.chat.id
     settings = await get_sleep_settings(user_id)
@@ -62,7 +64,7 @@ async def sleeps_main(message: Any, bot: Any) -> None:
     )
 
 
-async def handle_sleep_log_start(call: Any, bot: Any) -> None:
+async def handle_sleep_log_start(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Отмечает начало сна и обновляет дашборд с кнопкой пробуждения."""
     user_id = call.message.chat.id
     now = await get_user_time_now(user_id)
@@ -76,7 +78,7 @@ async def handle_sleep_log_start(call: Any, bot: Any) -> None:
     )
 
 
-async def handle_sleep_log_end(call: Any, bot: Any) -> None:
+async def handle_sleep_log_end(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Отмечает пробуждение: проверяет минимальный срок сна и начисляет XP по качеству сна."""
     user_id = call.message.chat.id
     # Проверяем минимум 30 минут сна
@@ -126,7 +128,7 @@ async def handle_sleep_log_end(call: Any, bot: Any) -> None:
         await award_xp(bot, user_id, 'sleep_short')
 
 
-async def handle_sleep_history(call: Any, bot: Any) -> None:
+async def handle_sleep_history(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Паказывает историю последних 7 сессий сна."""
     history = await get_sleep_history(call.message.chat.id, 7)
     await bot.edit_message_text(

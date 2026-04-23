@@ -1,7 +1,9 @@
 import logging
 import re
 import asyncio
-from typing import Any
+
+from telebot.async_telebot import AsyncTeleBot
+
 from database import replace_status
 from handlers.admin_notifications import admin_censorship_violation
 from utils.censorship.word_filter import banned_words, banned_phrases
@@ -55,7 +57,7 @@ async def censor_check(text: str) -> bool:
     elif await ai_censor(text):
         return False
     return True
-async def removal_of_admin_rights(bot: Any, message: Any, sender_id: int, sender_username: str | None, content_type: str) -> None:
+async def removal_of_admin_rights(bot: AsyncTeleBot, message: str, sender_id: int, sender_username: str | None, content_type: str) -> None:
     """Снимает права администратора за нарушение цензуры и уведомляет владельцев."""
     await replace_status('User', user_id=sender_id)
     if is_owner(sender_id):

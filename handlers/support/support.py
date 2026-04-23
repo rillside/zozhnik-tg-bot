@@ -1,6 +1,8 @@
 ﻿import asyncio
 from datetime import datetime, timedelta
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     add_ticket,
@@ -56,7 +58,7 @@ from utils.fsm import State
 from utils.media_storage import save_media_to_channel, send_media_with_fallback
 
 
-async def _deny_locked_admin_action(call: Any, bot: Any) -> None:
+async def _deny_locked_admin_action(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     await bot.answer_callback_query(call.id, ticket_locked_by_other_admin_msg, show_alert=True)
     try:
         await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -64,14 +66,15 @@ async def _deny_locked_admin_action(call: Any, bot: Any) -> None:
         pass
 
 
-async def _ensure_admin_ticket_access(call: Any, bot: Any, ticket_id: int) -> bool:
+async def _ensure_admin_ticket_access(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, ticket_id: int) -> bool:
     if await is_ticket_locked_for_admin(ticket_id, call.message.chat.id):
         await _deny_locked_admin_action(call, bot)
         return False
     return True
 
 
-async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str, call: Any | None = None) -> None:
+async def opening_ticket(message: telebot.types.Message, bot: AsyncTeleBot, id_ticket: int | str, role: str,
+                         call: telebot.types.CallbackQuery | None = None) -> None:
     """Открывает тикет для пользователя или админа: формирует историю сообщений и отправляет с клавиатурой действий."""
     max_char = 3800
     id_ticket = int(id_ticket)
@@ -138,7 +141,7 @@ async def opening_ticket(message: Any, bot: Any, id_ticket: int | str, role: str
         await replace_ticket_status(id_ticket, 'no_new', role)
     State.set_state(message.chat.id, 'waiting_send_msg_to_ticket', [id_ticket, role, last_msg, type_ticket, user_id])
 
-async def opening_photo_in_ticket(call: Any, bot: Any, msg_id: str) -> None:
+async def opening_photo_in_ticket(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, msg_id: str) -> None:
     """Отправляет фото из тикета с fallback-механизмом через канал хранения."""
     state, state_data = State.get_state(call.message.chat.id)
     role = state_data[1] if state == 'waiting_send_msg_to_ticket' and state_data else None
@@ -167,7 +170,7 @@ async def opening_photo_in_ticket(call: Any, bot: Any, msg_id: str) -> None:
         reply_markup=cancel_media_keyboard(),
         update_callback=update_callback if channel_message_id else None
     )
-async def handle_delete_ticket(call: Any, bot: Any, type_handle: str) -> None:
+async def handle_delete_ticket(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, type_handle: str) -> None:
     """Диспетчер удаления тикета: запрос подтверждения, подтверждение или отмена."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if type_handle == 'delete':
@@ -189,7 +192,8 @@ async def handle_delete_ticket(call: Any, bot: Any, type_handle: str) -> None:
         State.clear_state(call.message.chat.id)
 
 
-async def handling_aggressive_content(call: Any, bot: Any, content_type: str) -> None:
+async def handling_aggressive_content(call: telebot.types.CallbackQuery, bot: AsyncTeleBot,
+                                      content_type: str) -> None:
     """Обрабатывает подтверждение / отмену агрессивного заголовка или сообщения в тикете."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if content_type == 'title':
@@ -207,17 +211,29 @@ async def handling_aggressive_content(call: Any, bot: Any, content_type: str) ->
         else:
             await bot.send_message(call.message.chat.id, ticket_closed_msg())
     else:
-        ticket_id = call.data.split('_')[4]
-        if call.data.split('_')[3] == 'accept':
-            text = call.data.split('_')[5]
+        # Текст сообщения хранится в FSM (не в callback_data) — читаем оттуда.
+        _, fsm_data = State.get_state(call.message.chat.id)
+        ticket_id = fsm_data.get('ticket_id') if isinstance(fsm_data, dict) else None
+
+        parts = call.data.split('_')
+        action = parts[4]  # aggressive_msg_to_ticket_{accept|cancel}_{ticket_id}
+
+        if action == 'accept':
+            text = fsm_data.get('text', '') if isinstance(fsm_data, dict) else ''
+            State.clear_state(call.message.chat.id)
+            if ticket_id is None:
+                return
             await send_supp_msg(ticket_id, text, 1)
             await opening_ticket(call.message, bot, ticket_id, 'user')
         else:
+            State.clear_state(call.message.chat.id)
             await bot.answer_callback_query(call.id, cancellation, show_alert=False)
-            await opening_ticket(call.message, bot, ticket_id, 'user')
+            if ticket_id is not None:
+                await opening_ticket(call.message, bot, ticket_id, 'user')
 
 
-async def create_ticket(message: Any, bot: Any, type_ticket: str, last_msg_id: int | None = None) -> None:
+async def create_ticket(message: telebot.types.Message, bot: AsyncTeleBot,
+                        type_ticket: str, last_msg_id: int | None = None) -> None:
     """Создаёт новый тикет поддержки по заголовку из сообщения с проверкой цензуры."""
     last_msg = State.get_data_only(message.chat.id)
     if last_msg:
@@ -248,9 +264,13 @@ async def create_ticket(message: Any, bot: Any, type_ticket: str, last_msg_id: i
             )
 
 
-async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, role: str, last_msg: Any,
-                                 type_ticket: str, user_id: int, type_msg: str = 'message',
-                                 file_id: str | None = None, caption: str | None = None) -> None:
+async def send_message_to_ticket(message: telebot.types.Message, bot: AsyncTeleBot,
+                                 ticket_id: int | str, role: str,
+                                 last_msg: telebot.types.Message,
+                                 type_ticket: str, user_id: int,
+                                 type_msg: str = 'message',
+                                 file_id: str | None = None,
+                                 caption: str | None = None) -> None:
     """Отправляет сообщение или фото в тикет: проверяет цензуру, сохраняет в БД и уведомляет собеседника."""
     ticket_id = int(ticket_id)
     if role == 'admin' and await is_ticket_locked_for_admin(ticket_id, message.chat.id):
@@ -295,12 +315,18 @@ async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, r
                 await replace_ticket_status(ticket_id, 'new', role_recipient)
         else:
             if role == 'user':
+                # Сохраняем текст в FSM, чтобы не передавать его в callback_data
+                # (Telegram ограничивает callback_data до 64 байт)
+                State.set_state(message.chat.id, 'waiting_aggressive_msg_confirm', {
+                    'ticket_id': ticket_id,
+                    'text': text,
+                    'role': role,
+                    'type_ticket': type_ticket,
+                    'user_id': user_id,
+                })
                 await bot.send_message(message.chat.id,
                                        aggressive_content_warning_msg('сообщении'),
-                                       reply_markup=
-                                       accept_aggressive_msg_keyboard(
-                                           ticket_id, text)
-                                       )
+                                       reply_markup=accept_aggressive_msg_keyboard(ticket_id))
                 return
             else:
                 await removal_of_admin_rights(bot, text,
@@ -316,7 +342,7 @@ async def send_message_to_ticket(message: Any, bot: Any, ticket_id: int | str, r
     await opening_ticket(message, bot, ticket_id, role)
 
 
-async def ticket_exit(call: Any, bot: Any) -> None:
+async def ticket_exit(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Закрывает просмотр тикета и возвращает пользователя к списку тикетов."""
     role = 'admin' if call.data.split('_')[-2] == 'admin' else 'user'
     state, state_data = State.get_state(call.message.chat.id)
@@ -365,7 +391,7 @@ async def ticket_exit(call: Any, bot: Any) -> None:
         else:
             await bot.answer_callback_query(call.id, no_active_tickets_msg, show_alert=False)
 
-async def tickets_exit(call: Any, bot: Any) -> None:
+async def tickets_exit(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Закрывает список тикетов и возвращает на главный экран поддержки."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if call.data.split('_')[2] == 'user':
@@ -381,7 +407,7 @@ async def tickets_exit(call: Any, bot: Any) -> None:
                                )
 
 
-async def look_ticket_page(call: Any, bot: Any) -> None:
+async def look_ticket_page(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Переходит на указанную страницу списка тикетов."""
     page, role = call.data.split('_')[2], call.data.split('_')[3]
     if role == 'admin':
@@ -408,7 +434,7 @@ async def look_ticket_page(call: Any, bot: Any) -> None:
                                )
 
 
-async def admin_look_tickets(call: Any, bot: Any) -> None:
+async def admin_look_tickets(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Отображает список тикетов выбранного типа для админа."""
     type_supp = call.data.split('_')[2]
     if await count_tickets_for_admin(type_supp):

@@ -411,11 +411,15 @@ def accept_aggressive_title_keyboard(title: str, type_ticket: str) -> types.Inli
     return keyboard
 
 
-def accept_aggressive_msg_keyboard(ticket_id: int, text: str) -> types.InlineKeyboardMarkup:
-    """Клавиатура подтверждения сообщения в тикете, помеченного как агрессивное."""
+def accept_aggressive_msg_keyboard(ticket_id: int) -> types.InlineKeyboardMarkup:
+    """Клавиатура подтверждения сообщения в тикете, помеченного как агрессивное.
+
+    Текст сообщения хранится в FSM (State), а не в callback_data,
+    чтобы не превышать лимит Telegram в 64 байта.
+    """
     keyboard = types.InlineKeyboardMarkup()
     btn_accept = types.InlineKeyboardButton("✅ Подтвердить отправку",
-                                            callback_data=f'aggressive_msg_to_ticket_accept_{ticket_id}_{text}')
+                                            callback_data=f'aggressive_msg_to_ticket_accept_{ticket_id}')
     btn_cancel = types.InlineKeyboardButton("❌ Отменить отправку",
                                             callback_data=f'aggressive_msg_to_ticket_cancel_{ticket_id}')
     keyboard.add(btn_accept, btn_cancel)
@@ -539,7 +543,7 @@ def exercise_confirm_keyboard(has_video: bool = True) -> types.InlineKeyboardMar
         types.InlineKeyboardButton("❌ Отмена", callback_data="add_exercise_cancel")
     )
     return keyboard
-    return keyboard
+
 def exercise_category_filter_keyboard() -> types.InlineKeyboardMarkup:
     """Клавиатура выбора категории для фильтрации при редактировании упражнений."""
     keyboard = types.InlineKeyboardMarkup(row_width=2)

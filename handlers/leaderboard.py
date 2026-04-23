@@ -1,10 +1,12 @@
+import telebot
+from telebot.async_telebot import AsyncTeleBot
+
 from database import get_leaderboard, get_user_rank, get_user_xp
 from keyboards import leaderboard_keyboard, xp_profile_keyboard
 from messages import leaderboard_msg, profile_xp_msg
-from typing import Any
 
 
-async def show_leaderboard(source: Any, bot: Any) -> None:
+async def show_leaderboard(source: telebot.types.Message | telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Показывает таблицу лидеров; источником может быть сообщение или колбэк-запрос."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id
@@ -22,7 +24,7 @@ async def show_leaderboard(source: Any, bot: Any) -> None:
     await send(text, leaderboard_keyboard())
 
 
-async def show_xp_profile(source: Any, bot: Any) -> None:
+async def show_xp_profile(source: telebot.types.Message | telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Показывает XP-профиль пользователя; источником может быть сообщение или колбэк-запрос."""
     if hasattr(source, 'chat'):
         user_id = source.chat.id

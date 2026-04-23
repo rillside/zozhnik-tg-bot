@@ -3,14 +3,17 @@
 Сохраняет фото/видео в канал и обеспечивает fallback при отправке.
 """
 import logging
-from typing import Any, Callable
+from typing import Callable
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from config import media_storage_channel_id
 
 _logger = logging.getLogger(__name__)
 
 
-async def save_media_to_channel(bot: Any, file_id: str, media_type: str = 'photo') -> tuple:
+async def save_media_to_channel(bot: AsyncTeleBot, file_id: str, media_type: str = 'photo') -> tuple:
     """
     Сохраняет медиафайл в канал хранения.
 
@@ -62,10 +65,10 @@ async def save_media_to_channel(bot: Any, file_id: str, media_type: str = 'photo
         return None, file_id
 
 
-async def send_media_with_fallback(bot: Any, chat_id: int, file_id: str, channel_message_id: int | None,
+async def send_media_with_fallback(bot: AsyncTeleBot, chat_id: int, file_id: str, channel_message_id: int | None,
                                    media_type: str = 'photo', caption: str | None = None,
-                                   reply_markup: Any = None,
-                                   update_callback: Callable | None = None) -> Any:
+                                   reply_markup: telebot.types.InlineKeyboardMarkup | None = None,
+                                   update_callback: Callable | None = None) -> telebot.types.Message | None:
     """
     Отправляет медиафайл с резервным сценарием.
 

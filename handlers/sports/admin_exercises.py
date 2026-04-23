@@ -1,5 +1,7 @@
 import asyncio
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     add_exercise_to_db,
@@ -103,7 +105,7 @@ async def validate_exercise_censorship(name: str, description: str) -> bool:
     return True
 
 
-async def exercise_management(message: Any, bot: Any, first_name: str | None = None) -> None:
+async def exercise_management(message: telebot.types.Message, bot: AsyncTeleBot, first_name: str | None = None) -> None:
     """Отображает главное меню управления упражнениями для администратора."""
     first_name = first_name or message.from_user.first_name
     await bot.send_message(message.chat.id, admin_exercise_menu_msg(
@@ -112,7 +114,7 @@ async def exercise_management(message: Any, bot: Any, first_name: str | None = N
                            )
 
 
-async def handle_exercise_accept(user_id: int, bot: Any) -> bool:
+async def handle_exercise_accept(user_id: int, bot: AsyncTeleBot) -> bool:
     """Показывает карточку подтверждения перед сохранением нового упражнения."""
     res = get_validated_data(user_id)
     if res:
@@ -135,7 +137,7 @@ async def handle_exercise_accept(user_id: int, bot: Any) -> bool:
     return True
 
 
-async def save_exercise(user_id: int, username: str | None, bot: Any) -> None:
+async def save_exercise(user_id: int, username: str | None, bot: AsyncTeleBot) -> None:
     """Сохраняет новое упражнение в базу данных после прохождения цензуры."""
     res = get_validated_data(user_id)
     if res:
@@ -159,7 +161,7 @@ async def save_exercise(user_id: int, username: str | None, bot: Any) -> None:
         await bot.send_message(user_id, exercise_add_error)
 
 
-async def exercise_go_back(call: Any, bot: Any) -> None:
+async def exercise_go_back(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает нажатие кнопки «Назад» при пошаговом добавлении упражнения."""
     state, data = State.get_state(call.message.chat.id)
 
@@ -214,7 +216,7 @@ async def exercise_go_back(call: Any, bot: Any) -> None:
     )
 
 
-async def start_add_exercise(call: Any, bot: Any) -> None:
+async def start_add_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Запускает пошаговый процесс добавления нового упражнения."""
     State.set_state(call.message.chat.id, 'adding_exercise', {})
     await bot.send_message(call.message.chat.id,
@@ -223,7 +225,7 @@ async def start_add_exercise(call: Any, bot: Any) -> None:
                            )
 
 
-async def handle_exercise_name(message: Any, bot: Any) -> None:
+async def handle_exercise_name(message: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает ввод названия упражнения и сохраняет его в состояние."""
     state, data = State.get_state(message.chat.id)
     if await is_exercise_name_exists(message.text):
@@ -248,7 +250,7 @@ async def handle_exercise_name(message: Any, bot: Any) -> None:
                            )
 
 
-async def handle_exercise_description(message: Any, bot: Any) -> None:
+async def handle_exercise_description(message: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает ввод описания упражнения и сохраняет его в состояние."""
     state, data = State.get_state(message.chat.id)
 
@@ -272,7 +274,7 @@ async def handle_exercise_description(message: Any, bot: Any) -> None:
                            reply_markup=ex_category_keyboard())
 
 
-async def handle_exercise_category(call: Any, bot: Any) -> None:
+async def handle_exercise_category(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор категории упражнения и сохраняет его в состояние."""
     state, data = State.get_state(call.message.chat.id)
     if state != 'adding_exercise':
@@ -289,7 +291,7 @@ async def handle_exercise_category(call: Any, bot: Any) -> None:
     )
 
 
-async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
+async def handle_exercise_difficulty(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор уровня сложности упражнения и сохраняет его в состояние."""
     state, data = State.get_state(call.message.chat.id)
     if state != 'adding_exercise':
@@ -306,7 +308,7 @@ async def handle_exercise_difficulty(call: Any, bot: Any) -> None:
     )
 
 
-async def handle_exercise_video(message: Any, bot: Any) -> None:
+async def handle_exercise_video(message: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает загрузку видео к упражнению и переходит к подтверждению."""
     state, data = State.get_state(message.chat.id)
     file_id = message.video.file_id if message.video else message.animation.file_id
@@ -316,7 +318,7 @@ async def handle_exercise_video(message: Any, bot: Any) -> None:
     await handle_exercise_accept(message.chat.id, bot)
 
 
-async def skip_exercise_video(call: Any, bot: Any) -> None:
+async def skip_exercise_video(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Пропускает шаг добавления видео при создании упражнения."""
     user_id = call.message.chat.id
     state, data = State.get_state(user_id)
@@ -333,7 +335,7 @@ async def skip_exercise_video(call: Any, bot: Any) -> None:
     await handle_exercise_accept(user_id, bot)
 
 
-async def open_video(call: Any, bot: Any, is_moment_of_creation: bool = True) -> None:
+async def open_video(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, is_moment_of_creation: bool = True) -> None:
     """Отправляет видео упражнения пользователю: при создании или при редактировании существующего."""
     if is_moment_of_creation:
         res = get_validated_data(call.message.chat.id)
@@ -384,7 +386,7 @@ async def open_video(call: Any, bot: Any, is_moment_of_creation: bool = True) ->
             )
 
 
-async def edit_exercise_start(call: Any, bot: Any) -> None:
+async def edit_exercise_start(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Запускает режим редактирования упражнений: предлагает выбрать категорию."""
     await bot.send_message(
         call.message.chat.id,
@@ -393,7 +395,7 @@ async def edit_exercise_start(call: Any, bot: Any) -> None:
     )
 
 
-async def edit_exercise_handle_category(call: Any, bot: Any) -> None:
+async def edit_exercise_handle_category(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор категории при редактировании: предлагает выбрать сложность."""
     category = call.data.split('_')[-1]
     await bot.edit_message_text(
@@ -404,7 +406,7 @@ async def edit_exercise_handle_category(call: Any, bot: Any) -> None:
     )
 
 
-async def edit_exercise_show_list(call: Any, bot: Any) -> None:
+async def edit_exercise_show_list(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Показывает список упражнений для редактирования с пагинацией.
     Может вызываться:
@@ -449,7 +451,7 @@ async def edit_exercise_show_list(call: Any, bot: Any) -> None:
               )
 
 
-async def open_exercise_for_edit(bot: Any, call: Any = None, ex_id: int | None = None, message: Any = None) -> None:
+async def open_exercise_for_edit(bot: AsyncTeleBot, call: telebot.types.CallbackQuery | None = None, ex_id: int | None = None, message: telebot.types.Message | None = None) -> None:
     """
     Открывает упражнение
     - из инлайн-кнопки.
@@ -486,7 +488,7 @@ async def open_exercise_for_edit(bot: Any, call: Any = None, ex_id: int | None =
     )
 
 
-async def handle_exercise_edit(call: Any, bot: Any) -> None:
+async def handle_exercise_edit(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор поля для редактирования и переводит в соответствующее состояние."""
     user_id = call.message.chat.id
     ex_id, action = call.data.split('_')[3:]
@@ -526,7 +528,7 @@ async def handle_exercise_edit(call: Any, bot: Any) -> None:
               )
 
 
-async def save_exercise_changes(bot: Any, message: Any = None, call: Any = None) -> None:
+async def save_exercise_changes(bot: AsyncTeleBot, message: telebot.types.Message | None = None, call: telebot.types.CallbackQuery | None = None) -> None:
     """Сохраняет изменения конкретного поля упражнения в базу данных."""
     if message:
         user_id = message.chat.id
@@ -618,7 +620,7 @@ async def save_exercise_changes(bot: Any, message: Any = None, call: Any = None)
         await open_exercise_for_edit(bot, call=call, ex_id=ex_id)
     else:
         await open_exercise_for_edit(bot, message=message, ex_id=ex_id)
-async def accept_delete_exercise(call: Any, bot: Any) -> None:
+async def accept_delete_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Запрашивает подтверждение удаления упражнения."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     ex_id,category,difficulty = call.data.split('_')[3:]
@@ -627,7 +629,7 @@ async def accept_delete_exercise(call: Any, bot: Any) -> None:
         confirm_delete_exercise_msg(ex_id),
         reply_markup=ex_confirm_delete_keyboard(ex_id,category,difficulty)
     )
-async def delete_exercise(call: Any, bot: Any) -> None:
+async def delete_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Удаляет упражнение из базы данных после подтверждения."""
     await bot.answer_callback_query(call.id,exercise_deleted_msg)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -638,7 +640,7 @@ async def delete_exercise(call: Any, bot: Any) -> None:
         await exercise_management(call.message,bot,call.from_user.first_name)
         return
     await edit_exercise_show_list(call,bot)
-async def cancel_delete_exercise(call: Any, bot: Any) -> None:
+async def cancel_delete_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Отменяет удаление упражнения и возвращает к его карточке."""
     await bot.answer_callback_query(call.id,cancellation)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -649,7 +651,7 @@ async def cancel_delete_exercise(call: Any, bot: Any) -> None:
     ex_id = call.data.split('_')[-3]
     await open_exercise_for_edit(bot,call=call,ex_id=ex_id)
 
-async def stats_exercise(call: Any, bot: Any) -> None:
+async def stats_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Показывает общую статистику упражнений для администратора."""
     stats = await get_exercise_stats()
     await bot.send_message(

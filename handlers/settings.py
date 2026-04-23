@@ -1,5 +1,7 @@
+import telebot
+from telebot.async_telebot import AsyncTeleBot
+
 from config import is_admin
-from typing import Any
 from database import count_users_trackers, update_activity_goal, \
     activity_set_reminder_type, water_set_reminder_type, get_timezone, \
     set_timezone, update_water_goal, \
@@ -26,7 +28,7 @@ from messages import activity_tracker_setup_msg, activity_goal_selection_msg, \
 from utils.fsm import State
 
 
-async def select_timezone(call: Any, bot: Any) -> None:
+async def select_timezone(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Сохраняет выбранный часовой пояс и переводит на главное меню или приветственное сообщение."""
     timezone_offset = int(call.data.split('_')[1])
     old_timezone = await get_timezone(call.message.chat.id)
@@ -48,7 +50,7 @@ async def select_timezone(call: Any, bot: Any) -> None:
         )
 
 
-async def set_reminder_type_water(call: Any, bot: Any) -> None:
+async def set_reminder_type_water(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает выбор типа напоминаний о воде (требует установленной цели)."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if await count_users_trackers('track_water', 'goal_ml', call.message.chat.id):
@@ -64,7 +66,7 @@ async def set_reminder_type_water(call: Any, bot: Any) -> None:
                          reply_markup=water_goal_keyboard())
 
 
-async def water_smart_type_install(call: Any, bot: Any) -> None:
+async def water_smart_type_install(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Устанавливает умный режим напоминаний о воде."""
     await bot.answer_callback_query(call.id, water_reminder_type_smart_msg, show_alert=False)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -76,7 +78,7 @@ async def water_smart_type_install(call: Any, bot: Any) -> None:
     )
 
 
-async def water_setting_interval(call: Any, bot: Any, step: str) -> None:
+async def water_setting_interval(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, step: str) -> None:
     """Устанавливает интервал напоминаний о воде или возвращается назад (шаг: `install` / `exit`)."""
     if step == 'exit':
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
@@ -99,7 +101,7 @@ async def water_setting_interval(call: Any, bot: Any, step: str) -> None:
         await water_set_reminder_type(call.message.chat.id, 'Interval', interval)
 
 
-async def water_goal_custom_stg(bot: Any, message: Any, call: Any, send_msg: Any) -> None:
+async def water_goal_custom_stg(bot: AsyncTeleBot, message: telebot.types.Message, call: telebot.types.CallbackQuery, send_msg: telebot.types.Message) -> None:
     """Обрабатывает ввод произвольной цели по воде и сохраняет её."""
     ml = message.text.strip()
     if ml.replace('.', '', 1).isdigit():
@@ -127,7 +129,7 @@ async def water_goal_custom_stg(bot: Any, message: Any, call: Any, send_msg: Any
         State.set_state(call.message.chat.id,'waiting_custom_water_goal',[call,send_msg])
 
 
-async def water_goal_settings(call: Any, bot: Any, step: str) -> None:
+async def water_goal_settings(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, step: str) -> None:
     """Диспетчер действий с целью воды: установка, произвольный ввод, выход или отмена (шаг)."""
     if step == 'set_goal':
         goal_ml = int(call.data.split('_')[-1])
@@ -162,7 +164,7 @@ async def water_goal_settings(call: Any, bot: Any, step: str) -> None:
                          water_goal_selection_msg(call.from_user.first_name),
                          reply_markup=water_goal_keyboard()
                          )
-async def activity_settings_open(call: Any, bot: Any) -> None:
+async def activity_settings_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает настройки трекера активности."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     await bot.send_message(
@@ -172,7 +174,7 @@ async def activity_settings_open(call: Any, bot: Any) -> None:
     )
 
 
-async def activity_reminder_open(call: Any, bot: Any) -> None:
+async def activity_reminder_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает выбор типа напоминаний об активности (требует установленной цели)."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     if await count_users_trackers('track_activity', 'goal_exercises', call.message.chat.id):
@@ -189,7 +191,7 @@ async def activity_reminder_open(call: Any, bot: Any) -> None:
         )
 
 
-async def activity_smart_type_install(call: Any, bot: Any) -> None:
+async def activity_smart_type_install(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Устанавливает умный режим напоминаний об активности."""
     await bot.answer_callback_query(call.id, activity_reminder_type_smart_msg, show_alert=False)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -201,7 +203,7 @@ async def activity_smart_type_install(call: Any, bot: Any) -> None:
     )
 
 
-async def activity_interval_open(call: Any, bot: Any) -> None:
+async def activity_interval_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает выбор интервала напоминаний об активности."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     await bot.send_message(
@@ -211,7 +213,7 @@ async def activity_interval_open(call: Any, bot: Any) -> None:
     )
 
 
-async def activity_setting_interval(call: Any, bot: Any, step: str) -> None:
+async def activity_setting_interval(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, step: str) -> None:
     """Устанавливает интервал напоминаний об активности или возвращается назад (шаг: `install` / `exit`)."""
     if step == 'exit':
         await bot.answer_callback_query(call.id, cancellation, show_alert=False)
@@ -233,7 +235,7 @@ async def activity_setting_interval(call: Any, bot: Any, step: str) -> None:
         )
 
 
-async def activity_goal_settings(call: Any, bot: Any, step: str) -> None:
+async def activity_goal_settings(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, step: str) -> None:
     """Диспетчер действий с целью активности: установка, произвольный ввод, выход или отмена (шаг)."""
     if step == 'set_goal':
         goal = int(call.data.split('_')[-1])
@@ -272,7 +274,7 @@ async def activity_goal_settings(call: Any, bot: Any, step: str) -> None:
         )
 
 
-async def activity_goal_custom_stg(bot: Any, message: Any, call: Any, send_msg: Any) -> None:
+async def activity_goal_custom_stg(bot: AsyncTeleBot, message: telebot.types.Message, call: telebot.types.CallbackQuery, send_msg: telebot.types.Message) -> None:
     """Обрабатывает ввод произвольной цели активности и сохраняет её."""
     text = message.text.strip()
     if text.isdigit():
@@ -305,7 +307,7 @@ async def activity_goal_custom_stg(bot: Any, message: Any, call: Any, send_msg: 
         State.set_state(call.message.chat.id, 'waiting_custom_activity_goal', [call, send_msg])
 
 
-async def activity_stg_cancel(call: Any, bot: Any) -> None:
+async def activity_stg_cancel(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Узакрывает настройки активности и возвращается на главный экран настроек."""
     await bot.answer_callback_query(call.id, cancellation, show_alert=False)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -333,7 +335,7 @@ def _parse_time(text: str) -> str | None:
     return None
 
 
-async def sleep_settings_open(call: Any, bot: Any) -> None:
+async def sleep_settings_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает настройки трекера сна."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     settings = await get_sleep_settings(call.message.chat.id)
@@ -347,7 +349,7 @@ async def sleep_settings_open(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_stg_sleep_time_open(call: Any, bot: Any) -> None:
+async def sleep_stg_sleep_time_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает выбор времени отбоя."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     await bot.send_message(
@@ -357,7 +359,7 @@ async def sleep_stg_sleep_time_open(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_stg_wake_time_open(call: Any, bot: Any) -> None:
+async def sleep_stg_wake_time_open(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Открывает выбор времени подъёма."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     await bot.send_message(
@@ -367,7 +369,7 @@ async def sleep_stg_wake_time_open(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_select_sleep_time(call: Any, bot: Any) -> None:
+async def sleep_select_sleep_time(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор времени отбоя из кнопок или кастомный ввод."""
     time_str = call.data.replace('select_sleep_time_', '')
     await update_sleep_time(call.message.chat.id, time_str)
@@ -383,7 +385,7 @@ async def sleep_select_sleep_time(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_select_wake_time(call: Any, bot: Any) -> None:
+async def sleep_select_wake_time(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Обрабатывает выбор времени подъёма из кнопок."""
     time_str = call.data.replace('select_wake_time_', '')
     await update_wake_time(call.message.chat.id, time_str)
@@ -399,7 +401,7 @@ async def sleep_select_wake_time(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_request_custom_sleep_time(call: Any, bot: Any) -> None:
+async def sleep_request_custom_sleep_time(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Запрашивает ручной ввод произвольного времени отбоя."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     send_msg = await bot.send_message(
@@ -409,7 +411,7 @@ async def sleep_request_custom_sleep_time(call: Any, bot: Any) -> None:
     State.set_state(call.message.chat.id, 'waiting_custom_sleep_time', [call, send_msg])
 
 
-async def sleep_request_custom_wake_time(call: Any, bot: Any) -> None:
+async def sleep_request_custom_wake_time(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Запрашивает ручной ввод произвольного времени подъёма."""
     await bot.delete_message(call.message.chat.id, call.message.message_id)
     send_msg = await bot.send_message(
@@ -419,7 +421,7 @@ async def sleep_request_custom_wake_time(call: Any, bot: Any) -> None:
     State.set_state(call.message.chat.id, 'waiting_custom_wake_time', [call, send_msg])
 
 
-async def sleep_custom_sleep_time_input(bot: Any, message: Any, call: Any, send_msg: Any) -> None:
+async def sleep_custom_sleep_time_input(bot: AsyncTeleBot, message: telebot.types.Message, call: telebot.types.CallbackQuery, send_msg: telebot.types.Message) -> None:
     """Обрабатывает кастомный ввод времени отбоя."""
     time_str = _parse_time(message.text)
     if time_str:
@@ -444,7 +446,7 @@ async def sleep_custom_sleep_time_input(bot: Any, message: Any, call: Any, send_
         State.set_state(message.chat.id, 'waiting_custom_sleep_time', [call, send_msg])
 
 
-async def sleep_custom_wake_time_input(bot: Any, message: Any, call: Any, send_msg: Any) -> None:
+async def sleep_custom_wake_time_input(bot: AsyncTeleBot, message: telebot.types.Message, call: telebot.types.CallbackQuery, send_msg: telebot.types.Message) -> None:
     """Обрабатывает кастомный ввод времени подъёма."""
     time_str = _parse_time(message.text)
     if time_str:
@@ -469,7 +471,7 @@ async def sleep_custom_wake_time_input(bot: Any, message: Any, call: Any, send_m
         State.set_state(message.chat.id, 'waiting_custom_wake_time', [call, send_msg])
 
 
-async def sleep_toggle_reminder(call: Any, bot: Any) -> None:
+async def sleep_toggle_reminder(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Переключает напоминания сна и обновляет страницу настроек."""
     enabled = await toggle_sleep_reminders(call.message.chat.id)
     await bot.answer_callback_query(call.id, sleep_reminder_toggle_msg(enabled), show_alert=False)
@@ -484,7 +486,7 @@ async def sleep_toggle_reminder(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_stg_cancel(call: Any, bot: Any) -> None:
+async def sleep_stg_cancel(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Закрывает настройки сна и возвращается на главный экран настроек."""
     await bot.answer_callback_query(call.id, cancellation, show_alert=False)
     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -495,7 +497,7 @@ async def sleep_stg_cancel(call: Any, bot: Any) -> None:
     )
 
 
-async def sleep_custom_time_cancel(call: Any, bot: Any) -> None:
+async def sleep_custom_time_cancel(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """Отменяет ввод пользовательского времени сна и возвращает в настройки трекера."""
     State.clear_state(call.message.chat.id)
     await bot.answer_callback_query(call.id, cancellation, show_alert=False)

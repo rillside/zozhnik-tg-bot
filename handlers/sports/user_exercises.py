@@ -1,5 +1,7 @@
 from datetime import datetime
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     add_ex_to_favorite,
@@ -75,7 +77,7 @@ def check_can_log_exercise(last_log: tuple | None, exercise_id: int) -> tuple[bo
     return True, None
 
 
-async def sports_start(message: Any, bot: Any, first_name: str | None = None) -> None:
+async def sports_start(message: telebot.types.Message, bot: AsyncTeleBot, first_name: str | None = None) -> None:
     """
     Главное меню раздела Физ-активность. Вызывается:
     - при нажатии на кнопку "💪 Физ-активность" (после настройки)
@@ -90,7 +92,7 @@ async def sports_start(message: Any, bot: Any, first_name: str | None = None) ->
     )
 
 
-async def sports_check_all_start(call: Any, bot: Any) -> None:
+async def sports_check_all_start(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Запускает просмотр всех упражнений.
     Отправляет пользователю сообщение с выбором категории.
@@ -103,7 +105,7 @@ async def sports_check_all_start(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_handle_category(call: Any, bot: Any) -> None:
+async def sports_handle_category(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Обрабатывает выбранную пользователем категорию.
     Отправляет сообщение с выбором уровня сложности.
@@ -120,7 +122,7 @@ async def sports_handle_category(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_show_list(call: Any, bot: Any) -> None:
+async def sports_show_list(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
        Показывает список упражнений с пагинацией.
        Обрабатывает:
@@ -149,7 +151,7 @@ async def sports_show_list(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_show_exercise(call: Any, bot: Any) -> None:
+async def sports_show_exercise(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Отображает детальную информацию об упражнении.
      Показывает название, описание, категорию, сложность,
@@ -170,7 +172,7 @@ async def sports_show_exercise(call: Any, bot: Any) -> None:
         call.message.message_id,
         reply_markup=sports_exercise_keyboard(ex_id, is_favorite, category, difficulty, has_video=bool(file_id))
     )
-async def toggle_favorite(call: Any, bot: Any) -> None:
+async def toggle_favorite(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Переключает статус избранного для упражнения.
 
@@ -190,7 +192,7 @@ async def toggle_favorite(call: Any, bot: Any) -> None:
     await sports_show_exercise(call, bot)
 
 
-async def sports_check_favorites_start(call: Any, bot: Any) -> None:
+async def sports_check_favorites_start(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Показывает список избранных упражнений пользователя.
     """
@@ -208,7 +210,7 @@ async def sports_check_favorites_start(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_show_favorites_page(call: Any, bot: Any) -> None:
+async def sports_show_favorites_page(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Обрабатывает переключение страниц в списке избранного.
     """
@@ -223,7 +225,7 @@ async def sports_show_favorites_page(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_back_to_categories(call: Any, bot: Any) -> None:
+async def sports_back_to_categories(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Возврат от выбора сложности к выбору категории.
     """
@@ -235,7 +237,7 @@ async def sports_back_to_categories(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_back_to_main(call: Any, bot: Any) -> None:
+async def sports_back_to_main(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Возврат в главное меню раздела Физ-активность.
     """
@@ -249,7 +251,7 @@ async def sports_back_to_main(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_mark_done(call: Any, bot: Any) -> None:
+async def sports_mark_done(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Показывает подтверждение выполнения упражнения.
     """
@@ -266,7 +268,7 @@ async def sports_mark_done(call: Any, bot: Any) -> None:
     )
 
 
-async def sports_confirm_done(call: Any, bot: Any) -> None:
+async def sports_confirm_done(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Подтверждает выполнение: проверяет лимиты времени, добавляет запись.
     """
@@ -295,7 +297,7 @@ async def sports_confirm_done(call: Any, bot: Any) -> None:
         await award_xp(bot, user_id, 'exercise_goal')
 
 
-async def sports_cancel_done(call: Any, bot: Any) -> None:
+async def sports_cancel_done(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Отмена подтверждения — возврат к карточке упражнения.
     """
@@ -304,7 +306,7 @@ async def sports_cancel_done(call: Any, bot: Any) -> None:
     await sports_show_exercise_for_ex_id(call, bot, ex_id)
 
 
-async def sports_show_exercise_for_ex_id(call: Any, bot: Any, ex_id: int) -> None:
+async def sports_show_exercise_for_ex_id(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, ex_id: int) -> None:
     """Показывает карточку упражнения по ex_id (для возврата из подтверждения или отмены)."""
     ex_info = await get_exercise_by_id(ex_id)
     if not ex_info:
@@ -321,7 +323,7 @@ async def sports_show_exercise_for_ex_id(call: Any, bot: Any, ex_id: int) -> Non
     )
 
 
-async def sports_show_my_stats(call: Any, bot: Any) -> None:
+async def sports_show_my_stats(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Показывает общую статистику пользователя по выполнению упражнений.
     """
@@ -345,7 +347,7 @@ async def sports_show_my_stats(call: Any, bot: Any) -> None:
         )
 
 
-async def sports_show_exercise_stats(call: Any, bot: Any) -> None:
+async def sports_show_exercise_stats(call: telebot.types.CallbackQuery, bot: AsyncTeleBot) -> None:
     """
     Показывает статистику по конкретному упражнению.
     """

@@ -224,7 +224,7 @@ async def add_user(user_id: int, username: str | None, status: str) -> None:
 async def all_users() -> list[int]:
     """Возвращает список ID пользователей."""
     async with get_connection() as conn:
-        cursor = await conn.execute('SELECT * FROM users')
+        cursor = await conn.execute('SELECT user_id FROM users')
         users = await cursor.fetchall()
     return [user[0] for user in users]
 

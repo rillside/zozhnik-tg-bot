@@ -53,8 +53,8 @@ def error_handler(func: Callable) -> Callable:
             if chat_id:
                 try:
                     await bot.send_message(chat_id, error_msg)
-                except:
-                    pass
+                except Exception as e:
+                    logging.error(f"Не удалось отправить сообщение об ошибке пользователю {chat_id}: {e}")
 
     return wrapper
 
@@ -94,18 +94,33 @@ async def start(message: telebot.types.Message) -> None:
 @bot.message_handler(content_types=['text'], func=lambda msg: State.user_states.get(msg.chat.id) is not None)
 async def state_handler(message: telebot.types.Message) -> None:
     """Обрабатывает сообщения в состоянии FSM."""
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, "🚫 Ваш аккаунт заблокирован.")
+        return
+    await update_username(message.chat.id, message.from_user.username, bot)
+    await update_user_activity_smart(message.chat.id)
     await handle_fsm_text(message, bot)
 
 
 @bot.message_handler(content_types=['photo'], func=lambda msg: State.user_states.get(msg.chat.id))
 async def handle_photo_with_state(message: telebot.types.Message) -> None:
     """Обрабатывает фотографии в состоянии FSM."""
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, "🚫 Ваш аккаунт заблокирован.")
+        return
+    await update_username(message.chat.id, message.from_user.username, bot)
+    await update_user_activity_smart(message.chat.id)
     await handle_fsm_photo(message, bot)
 
 
 @bot.message_handler(content_types=['video', 'animation'], func=lambda msg: State.user_states.get(msg.chat.id))
 async def handle_video_with_state(message: telebot.types.Message) -> None:
     """Обрабатывает видео и анимации в состоянии FSM."""
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, "🚫 Ваш аккаунт заблокирован.")
+        return
+    await update_username(message.chat.id, message.from_user.username, bot)
+    await update_user_activity_smart(message.chat.id)
     await handle_fsm_video(message, bot)
 
 
@@ -113,6 +128,9 @@ async def handle_video_with_state(message: telebot.types.Message) -> None:
 @error_handler
 async def msg(message: telebot.types.Message) -> None:
     """Обрабатывает обычные текстовые сообщения."""
+    if await is_user_banned(message.chat.id):
+        await bot.send_message(message.chat.id, "🚫 Ваш аккаунт заблокирован.")
+        return
     await update_username(message.chat.id, message.from_user.username, bot)
     await update_user_activity_smart(message.chat.id)
     await handle_main_message(message, bot)

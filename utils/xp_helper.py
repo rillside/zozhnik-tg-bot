@@ -1,5 +1,6 @@
 """Утилита для начисления XP и отправки уведомлений об этом."""
-from typing import Any
+from telebot.async_telebot import AsyncTeleBot
+
 from database import add_xp
 from messages import level_up_msg, xp_gained_msg
 
@@ -27,7 +28,7 @@ XP_ACTION_NAMES = {
 }
 
 
-async def award_xp(bot: Any, user_id: int, action: str, silent: bool = False) -> dict:
+async def award_xp(bot: AsyncTeleBot, user_id: int, action: str, silent: bool = False) -> dict:
     """
     Начисляет XP и отправляет сообщение пользователю.
     silent=True — не отправлять уведомление.

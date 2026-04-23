@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Any
+
+import telebot
+from telebot.async_telebot import AsyncTeleBot
 
 from database import (
     add_water_ml,
@@ -52,7 +54,7 @@ async def validate_water_addition(info: tuple, added_water_ml: int | str) -> tup
     return True, None
 
 
-async def handle_add_water(call: Any, bot: Any, step: str) -> None:
+async def handle_add_water(call: telebot.types.CallbackQuery, bot: AsyncTeleBot, step: str) -> None:
     """Диспетчер добавления воды: обрабатывает добавление порции, запрос произвольного значения или отмену."""
     if step == 'addition':
         water_add = call.data.split('_')[2]
@@ -98,7 +100,7 @@ async def handle_add_water(call: Any, bot: Any, step: str) -> None:
                          )
 
 
-async def add_custom_water(message: Any, bot: Any) -> None:
+async def add_custom_water(message: telebot.types.Message, bot: AsyncTeleBot) -> None:
     """Обрабатывает ввод произвольного объёма воды в мл: валидирует диапазон и запрашивает подтверждение."""
     ml = message.text.strip()
     if ml.isdigit():
