@@ -21,7 +21,7 @@ async def censor_load() -> None:
             toxicity_checker = Detoxify('original')  # Модель unitary/toxic-bert
             _logger.info("ИИ-модель загружена")
         except Exception as e:
-            _logger.warn(f"Ошибка загрузки Detoxify. ИИ-цензура отключена\n{e}")
+            _logger.warning(f"Ошибка загрузки Detoxify. ИИ-цензура отключена\n{e}")
             toxicity_checker = None
     else:
         toxicity_checker = None
@@ -42,7 +42,7 @@ async def ai_censor(text: str) -> bool:
         )
         return any(score > censorship_threshold for score in result.values())
     except Exception as e:
-        _logger.warn(f"Ошибка при работе ИИ-цензуры: {e}")
+        _logger.warning(f"Ошибка при работе ИИ-цензуры: {e}")
         return False
 
 

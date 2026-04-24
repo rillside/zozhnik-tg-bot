@@ -460,7 +460,7 @@ async def add_water_ml(user_id: int, volume_ml: int, add_total: bool = True) -> 
             await cursor.execute('UPDATE track_water SET Total = Total + ? WHERE user_id = ?',
                                  (volume_ml, user_id))
         await cursor.execute('INSERT INTO water_logs (user_id, amount, week_start) VALUES (?, ?, ?) ',
-                             (user_id, volume_ml, last_monday))
+                             (user_id, volume_ml, last_monday.isoformat()))
 
 async def water_stats(user_id: int) -> tuple:
     """Возвращает пару (goal_ml, выпито сегодня) для пользователя."""
