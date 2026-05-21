@@ -520,8 +520,14 @@ async def delete_water_log(log_id: int) -> None:
 async def get_users_for_water_reminders() -> list[tuple]:
     """Возвращает пользователей с включенными напоминаниями о воде."""
     async with get_connection() as conn:
-        cursor = await conn.execute('''SELECT user_id,broadcast_type,broadcast_interval,
-        last_broadcast,last_update FROM track_water WHERE broadcast_type IS NOT NULL''')
+        cursor = await conn.execute('''
+            SELECT tw.user_id, tw.broadcast_type, tw.broadcast_interval, tw.last_broadcast, tw.last_update
+            FROM track_water tw
+            LEFT JOIN sleep_logs sl
+                ON sl.user_id = tw.user_id AND sl.wake_up IS NULL
+            WHERE tw.broadcast_type IS NOT NULL
+              AND sl.user_id IS NULL
+        ''')
         result = await cursor.fetchall()
     return result
 
@@ -766,9 +772,13 @@ async def get_users_for_activity_reminders() -> list[tuple]:
     """Возвращает пользователей с настроенными напоминаниями об активности."""
     async with get_connection() as conn:
         cursor = await conn.execute('''
-            SELECT user_id, broadcast_type, broadcast_interval, last_broadcast
-            FROM track_activity
-            WHERE broadcast_type IS NOT NULL AND goal_exercises IS NOT NULL
+            SELECT ta.user_id, ta.broadcast_type, ta.broadcast_interval, ta.last_broadcast
+            FROM track_activity ta
+            LEFT JOIN sleep_logs sl
+                ON sl.user_id = ta.user_id AND sl.wake_up IS NULL
+            WHERE ta.broadcast_type IS NOT NULL
+              AND ta.goal_exercises IS NOT NULL
+              AND sl.user_id IS NULL
         ''')
         return await cursor.fetchall()
 
@@ -779,9 +789,11 @@ async def get_inactive_users_for_reminder() -> list[int]:
             SELECT u.user_id
             FROM users u
             LEFT JOIN track_activity a ON u.user_id = a.user_id
+            LEFT JOIN sleep_logs sl ON sl.user_id = u.user_id AND sl.wake_up IS NULL
             WHERE u.last_activity < datetime('now', '-4 days')
               AND (a.last_inactivity_reminder IS NULL
                    OR a.last_inactivity_reminder < datetime('now', '-4 days'))
+              AND sl.user_id IS NULL
         ''')
         return [row[0] for row in await cursor.fetchall()]
 
