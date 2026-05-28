@@ -7,3 +7,4 @@ database.db
 database.db-shm
 database.db-wal
 .pytest_cache/
+.vscode/

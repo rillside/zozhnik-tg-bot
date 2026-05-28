@@ -38,12 +38,12 @@ class State:
             del State.user_states[user_id]
 
     @staticmethod
-    def clear_state_keep_data(cls, user_id: int) -> None:
+    def clear_state_keep_data(user_id: int) -> None:
         """Сбрасывает состояние, оставляя сохраненные данные."""
-        if user_id not in cls.user_states:
+        if user_id not in State.user_states:
             return
-        data = cls.user_states[user_id].get("data")
-        cls.user_states[user_id] = {"state": None, "data": data}
+        data = State.user_states[user_id].get("data")
+        State.user_states[user_id] = {"state": None, "data": data}
 
     @classmethod
     def get_state(cls, user_id: int) -> tuple[str | None, Any]:

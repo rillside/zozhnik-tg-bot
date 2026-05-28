@@ -6,7 +6,6 @@ import database
 from database import xp_to_level, xp_for_next_level
 
 
-# ── Чистые функции (без БД) ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("xp,xp_per_level,expected_level", [
     (0,   100, 1),
@@ -28,7 +27,7 @@ def test_xp_to_level(xp, xp_per_level, expected_level):
     (0,   100, 100),
     (1,   100, 99),
     (99,  100, 1),
-    (100, 100, 100),   # только что получил уровень — до следующего полный цикл
+    (100, 100, 100),
     (150, 100, 50),
     (0,   50,  50),
     (25,  50,  25),
@@ -39,7 +38,7 @@ def test_xp_for_next_level(xp, xp_per_level, expected):
     assert xp_for_next_level(xp, xp_per_level) == expected
 
 
-# ── Фикстура: in-memory SQLite ────────────────────────────────────────────────
+# Фикстура: in-memory SQLite
 
 @pytest.fixture
 async def test_db(monkeypatch):
@@ -66,7 +65,7 @@ XP_REWARDS = {"water_goal": 20, "water_add": 5, "sleep_good": 40}
 XP_PER_LEVEL = 100
 
 
-# ── Пользователи ──────────────────────────────────────────────────────────────
+# Пользователи
 
 async def test_add_and_get_user_status(test_db):
     await database.add_user(1, "alice", "User")
@@ -98,7 +97,7 @@ async def test_is_user_valid_not_exists(test_db):
     assert result is None
 
 
-# ── Водный трекер ─────────────────────────────────────────────────────────────
+# Водный трекер
 
 async def test_water_stats_after_goal_set(test_db):
     await database.add_user(1, "alice", "User")

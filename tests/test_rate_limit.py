@@ -1,4 +1,3 @@
-import pytest
 from utils.rate_limit_send import rate_limited_gather
 
 

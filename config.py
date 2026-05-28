@@ -25,7 +25,7 @@ def load_owners() -> list:
 load_dotenv()
 token = os.getenv('TOKEN_BOT')  # Токен бота
 if not token:
-    raise ValueError("BOT_TOKEN не найден в .env файле!")
+    raise ValueError("TOKEN_BOT не найден в .env файле!")
 
 # Канал для хранения медиафайлов (фото/видео)
 # Бот должен быть админом в этом канале
